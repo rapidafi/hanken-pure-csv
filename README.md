@@ -210,7 +210,7 @@ TODO
 
 -o or --output `<outputfile>`
 
-* name of the file where result Virta-JTP XML is written
+* name of the file where result is written
 * file will be overwritten if it exists
 * defaults to confiration value
 * recommended to use configuration value
