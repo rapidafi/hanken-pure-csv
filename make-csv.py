@@ -18,13 +18,10 @@ Possible subject for improvement:
   All JSON files are read into memory. This is something that
   could easily be changed if there appears any performance issues.
 """
-import os, sys, getopt
+import sys, getopt
 import csv
 import json
-import re
-import requests
 import configparser
-from pprint import pprint
 
 def output(outputfile,jsondata,verbose):
   #jsondata = map(lambda x: flattenjson(x, "_"), jsondata)
