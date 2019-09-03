@@ -52,7 +52,7 @@ def flattenjson(b, delim):
     if isinstance(b[i], dict):
       get = flattenjson(b[i], delim)
       for j in get.keys():
-        val[ i + delim + j ] = get[j]
+        val[ i + delim + j ] = get[j].replace('\n','\\n').replace('\r','\\r')
     # my extra if list type with one value
     elif isinstance(b[i], list) and len(b[i]) == 1:
       if isinstance(b[i][0], dict):
@@ -60,10 +60,10 @@ def flattenjson(b, delim):
         for j in get.keys():
           val[ i + delim + j ] = get[j]
       else:
-        val[i] = b[i][0]
+        val[i] = b[i][0].replace('\n','\\n').replace('\r','\\r')
     # / my extra
     else:
-      val[i] = b[i]
+      val[i] = str(b[i]).replace('\n','\\n').replace('\r','\\r')
 
   return val
 
@@ -110,7 +110,7 @@ def main(argv):
   locale = None
   verbose = 1 # default minor messages
   inputfile = cfg.get(cfgsec,"researchfile") if cfg.has_option(cfgsec,"researchfile") else None
-  outputfile = cfg.get(cfgsec,"outputfile") if cfg.has_option(cfgsec,"outputfile") else None
+  outputfile = "research-outputs.csv" #cfg.get(cfgsec,"outputfile") if cfg.has_option(cfgsec,"outputfile") else None
 
   # read possible arguments. all optional given that defaults suffice
   try:
@@ -127,6 +127,10 @@ def main(argv):
     elif opt in ("-o", "--output"): outputfile = arg
     elif opt in ("-v", "--verbose"): verbose += 1
     elif opt in ("-q", "--quiet"): verbose -= 1
+
+  # fix outputfile if not given
+  if outputfile=="research-outputs.csv":
+    outputfile = inputfile.replace(".json",".csv")
 
   if not inputfile: exit("No input file. Exit.")
   if not outputfile: exit("No output file. Exit.")

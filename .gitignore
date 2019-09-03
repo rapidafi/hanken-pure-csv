@@ -4,3 +4,5 @@ Pure.cfg
 *.csv
 *.log
 *.xls*
+*.pbix
+*.zip

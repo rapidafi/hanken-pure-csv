@@ -58,7 +58,7 @@ def readjson(file,link1,link2,verbose):
         items.append({"research_output_uuid": row["uuid"], "managingOrganisationalUnit_uuid": row["managingOrganisationalUnit"]["uuid"]})
       #/
 
-      # research-output and person
+      # research-output and person (w/ external-persons!)
       if link1=='research-output' and link2=='person':
         authors = []
         for r in row["personAssociations"]:

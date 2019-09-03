@@ -68,9 +68,18 @@ TL;DR
 python get-pure.py research-outputs
 python get-pure.py organisational-units
 python get-pure.py persons
+python get-pure.py external-persons
 python get-pure.py journals
 # when source files are present:
-python make-csv.py
+python make-csv.py [-i research-outputs.json] [-o research-outputs.csv]
+python make-csv.py -i persons.json [-o persons.csv]
+python make-csv.py -i external-persons.json
+python make-csv.py -i organisational-units.json
+python make-csv.py -i journals.json
+# make separate linking files:
+python make-csv-link.py [-b person]
+python make-csv-link.py -b organisation
+...
 ```
 
 ## DOCUMENTATION
