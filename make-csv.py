@@ -22,6 +22,7 @@ Possible subject for improvement:
 import sys, getopt
 import csv
 import json
+import re
 import configparser
 
 def output(outputfile,items,verbose):
@@ -31,25 +32,24 @@ def output(outputfile,items,verbose):
 
   # write to outputfile (always)
   with open(outputfile, 'w', newline='', encoding="UTF-8") as f:
-    #writer = csv.DictWriter(f, fieldnames=csvdata[0], delimiter=';', quotechar='"', extrasaction='ignore')
     writer = csv.DictWriter(f, fieldnames=columns, delimiter=';', quotechar='"', extrasaction='ignore')
     writer.writeheader()
-    #writer = csv.writer(f, delimiter=';', quotechar='"')
-    #writer.writerow(columns)
     count=0
     for row in items:
       count+=1
       if verbose>2: print("Output CSV (%s) with row: %s"%(outputfile,row,))
       writer.writerow(row)
-      #writer.writerow(map(lambda x: row.get(x, ""), columns))
 
-  if verbose: print("Output written to file '%s' with %d rows"%(outputfile,count,))
+  if verbose: print("Output written to file '%s' with %d columns and %d rows"%(outputfile,len(columns),count,))
 
 # Helper function for Haris/Pure JSON regarding keywords
 def getkeywordvalue(keyword,item,verbose):
-  value = None
+  (title,value) = (None,None)
   if "keywordGroups" in item:
     for k in item["keywordGroups"]:
+      if "type" in k:
+        for t in k["type"]:
+          title = t["value"]
       if "keywords" in k:
         for w in k["keywords"]:
           if "uri" in w:
@@ -64,7 +64,7 @@ def getkeywordvalue(keyword,item,verbose):
             elif "dk/atira/pure/keywords/"+keyword+"/" in w["uri"]:
               value = w["uri"].split("/")[-1] # last index
   
-  return value
+  return (title,value)
 
 # Helper function for repeatedly used part of code
 def jv(objectname,jsonitem):
@@ -150,55 +150,6 @@ def parsejson(jsondata,keywords,verbose):
     item["managingOrganisationalUnit_uuid"] = managingOrganisationalUnit_uuid
     item["managingOrganisationalUnit_name_value"] = managingOrganisationalUnit_name_value
 
-    personAssociations_country_value = None
-    personAssociations_externalOrganisations_name_value = None
-    personAssociations_externalOrganisations_uuid = None
-    personAssociations_name_firstName = None
-    personAssociations_name_lastName = None
-    personAssociations_organisationalUnits_name_value = None
-    personAssociations_organisationalUnits_uuid = None
-    personAssociations_person_name_value = None
-    personAssociations_person_uuid = None
-    personAssociations_personRole_value = None
-    if "personAssociations" in j:
-      for a in j["personAssociations"]:
-        if "country" in a:
-          for b in a["country"]:
-            personAssociations_country_value = b["value"]
-        if "externalOrganisations" in a:
-          for b in a["externalOrganisations"]:
-            if "name" in b:
-              for c in b["name"]:
-                personAssociations_externalOrganisations_name_value = c["value"]
-            personAssociations_externalOrganisations_uuid = b["uuid"]
-        if "name" in a:
-          personAssociations_name_firstName = a["name"]["firstName"]
-          personAssociations_name_lastName = a["name"]["lastName"]
-        if "organisationalUnits" in a:
-          for b in a["organisationalUnits"]:
-            if "name" in b:
-              for c in b["name"]:
-                personAssociations_organisationalUnits_name_value = c["value"]
-            personAssociations_organisationalUnits_uuid = b["uuid"]
-        if "person" in a:
-          if "name" in a["person"]:
-            for c in a["person"]["name"]:
-              personAssociations_person_name_value = c["value"]
-          personAssociations_person_uuid = a["person"]["uuid"]
-        if "personRole" in a:
-          for b in a["personRole"]:
-            personAssociations_personRole_value = b["value"]
-    item["personAssociations_country_value"] = personAssociations_country_value
-    item["personAssociations_externalOrganisations_name_value"] = personAssociations_externalOrganisations_name_value
-    item["personAssociations_externalOrganisations_uuid"] = personAssociations_externalOrganisations_uuid
-    item["personAssociations_name_firstName"] = personAssociations_name_firstName
-    item["personAssociations_name_lastName"] = personAssociations_name_lastName
-    item["personAssociations_organisationalUnits_name_value"] = personAssociations_organisationalUnits_name_value
-    item["personAssociations_organisationalUnits_uuid"] = personAssociations_organisationalUnits_uuid
-    item["personAssociations_person_name_value"] = personAssociations_person_name_value
-    item["personAssociations_person_uuid"] = personAssociations_person_uuid
-    item["personAssociations_personRole_value"] = personAssociations_personRole_value
-
     item["articleNumber"] = jv("articleNumber",j)
 
     category_value = None
@@ -263,11 +214,89 @@ def parsejson(jsondata,keywords,verbose):
     item["totalScopusCitations"] = jv("totalScopusCitations",j)
 
     #TODO scopusMetrics
-    #TODO
-    #keywordGroups.keywords.value
-    #keywordGroups.type.value
     
-    items.append(item)
+    # keywords pivot
+    # - to title: keywordGroups.keywords.value => compromise this with setting value since there is no guarantee a keyword exists for all research-outputs
+    # - to value: keywordGroups.type.value
+    for k in keywords:
+      (keyword_title,keyword_value) = getkeywordvalue(k,j,verbose)
+      item["keyword_"+k] = keyword_value
+    
+    # nb! row multiplying data
+    # so do this/these last
+
+    # multiply rows per person!
+    added_persons = False # keep track if nothing was added
+    if "personAssociations" in j:
+      for a in j["personAssociations"]:
+        added_persons = True # .. will be added
+        # reset values here
+        personAssociations_country_value = ""
+        personAssociations_externalOrganisations_name_value = None
+        personAssociations_externalOrganisations_uuid = None
+        personAssociations_name_firstName = None
+        personAssociations_name_lastName = None
+        personAssociations_organisationalUnits_name_value = None
+        personAssociations_organisationalUnits_uuid = None
+        personAssociations_person_name_value = None
+        personAssociations_person_uuid = ""
+        personAssociations_externalPerson_name_value = None
+        personAssociations_externalPerson_uuid = ""
+        personAssociations_personRole_value = None
+        if "country" in a:
+          for b in a["country"]:
+            personAssociations_country_value = b["value"]
+        if "externalOrganisations" in a:
+          for b in a["externalOrganisations"]:
+            if "name" in b:
+              for c in b["name"]:
+                personAssociations_externalOrganisations_name_value = c["value"]
+            personAssociations_externalOrganisations_uuid = b["uuid"]
+        if "name" in a:
+          personAssociations_name_firstName = a["name"]["firstName"]
+          personAssociations_name_lastName = a["name"]["lastName"]
+        if "organisationalUnits" in a:
+          for b in a["organisationalUnits"]:
+            if "name" in b:
+              for c in b["name"]:
+                personAssociations_organisationalUnits_name_value = c["value"]
+            personAssociations_organisationalUnits_uuid = b["uuid"]
+        if "person" in a:
+          if "name" in a["person"]:
+            for c in a["person"]["name"]:
+              personAssociations_person_name_value = c["value"]
+          personAssociations_person_uuid = a["person"]["uuid"]
+        if "externalPerson" in a:
+          if "name" in a["externalPerson"]:
+            for c in a["externalPerson"]["name"]:
+              personAssociations_externalPerson_name_value = c["value"]
+          personAssociations_externalPerson_uuid = a["externalPerson"]["uuid"]
+        if "personRole" in a:
+          for b in a["personRole"]:
+            personAssociations_personRole_value = b["value"]
+        # add person values to item here, overwrite if 1+ round
+        item["personAssociations_country_value"] = personAssociations_country_value
+        item["personAssociations_externalOrganisations_name_value"] = personAssociations_externalOrganisations_name_value
+        item["personAssociations_externalOrganisations_uuid"] = personAssociations_externalOrganisations_uuid
+        item["personAssociations_name_firstName"] = personAssociations_name_firstName
+        item["personAssociations_name_lastName"] = personAssociations_name_lastName
+        item["personAssociations_organisationalUnits_name_value"] = personAssociations_organisationalUnits_name_value
+        item["personAssociations_organisationalUnits_uuid"] = personAssociations_organisationalUnits_uuid
+        item["personAssociations_person_name_value"] = personAssociations_person_name_value
+        item["personAssociations_person_uuid"] = personAssociations_person_uuid
+        item["personAssociations_externalPerson_name_value"] = personAssociations_externalPerson_name_value
+        item["personAssociations_externalPerson_uuid"] = personAssociations_externalPerson_uuid
+        item["personAssociations_personRole_value"] = personAssociations_personRole_value
+        # and append here (not at "root" loop end)
+        items.append(item.copy()) #nb! make a copy (not reference)
+    # nb! normal addition for person (and such) would be at this level
+
+    # normal "root" loop ending begins.
+    # would normally append here in all cases but person multiplying makes this special
+    # if no person was found then append here
+    if not added_persons:
+      if verbose: print("No person for: %s"&(item["uuid"],))
+      items.append(item.copy()) #nb! make a copy (not reference)
 
   return items
 
