@@ -118,11 +118,20 @@ def output(outputfile,items,verbose):
 
   if verbose: print("Output written to file '%s' with %d columns and %d rows"%(outputfile,len(columns),count,))
 
-# Helper function for repeatedly used part of code
+# Helper functions for repeatedly used part of code
+# get direct value from json with name
 def jv(objectname,jsonitem):
   value = None
   if objectname in jsonitem:
     value = jsonitem[objectname]
+  return value
+# get "value" under an unnecessary list (xml to json conversion I suppose) from json with name
+def jvs_value(objectname,jsonitem):
+  value = None
+  if objectname in jsonitem:
+    for a in jsonitem[objectname]: # on a rare occasion there may be many, return last
+      if "value" in a:
+        value = a["value"]
   return value
 
 # go thru given JSON. Look for bits were interested in and write to output file (CSV)
@@ -143,11 +152,7 @@ def parsejson(jsondata,keywords,metricdata,verbose):
 
     item["title"] = jv("title",j)
 
-    abstract = None
-    if "abstract" in j:
-      for a in j["abstract"]:
-        abstract = a["value"]
-    item["abstract"] = abstract
+    item["abstract"] = jvs_value("abstract",j)
 
     language = None
     if "language" in j:
@@ -164,18 +169,8 @@ def parsejson(jsondata,keywords,metricdata,verbose):
     item["language"] = language
 
     item["type"] = jv("type",j)[0]["value"] # only one or first will suffice
-
-    category = None
-    if "category" in j:
-      for a in j["category"]:
-        category = a["value"]
-    item["category"] = category
-
-    assessmentType = None
-    if "assessmentType" in j:
-      for a in j["assessmentType"]:
-        assessmentType = a["value"]
-    item["assessmentType"] = assessmentType
+    item["category"] = jvs_value("category",j)
+    item["assessmentType"] = jvs_value("assessmentType",j)
 
     publicationStatuses_publicationDate_year = None
     publicationStatuses_current = None
@@ -184,19 +179,12 @@ def parsejson(jsondata,keywords,metricdata,verbose):
       for a in j["publicationStatuses"]:
         publicationStatuses_publicationDate_year = a["publicationDate"]["year"]
         publicationStatuses_current = a["current"]
-        if "publicationStatus" in a:
-          for b in a["publicationStatus"]:
-            publicationStatuses_publicationStatus = b["value"]
+        publicationStatuses_publicationStatus = jvs_value("publicationStatus",a)
     item["publicationStatuses_publicationDate_year"] = publicationStatuses_publicationDate_year
     item["publicationStatuses_current"] = publicationStatuses_current
     item["publicationStatuses_publicationStatus"] = publicationStatuses_publicationStatus
 
-    workflow = None
-    if "workflow" in j:
-      for a in j["workflow"]:
-        workflow = a["value"]
-    item["workflow"] = workflow
-
+    item["workflow"] = jvs_value("workflow",j)
     item["totalNumberOfAuthors"] = str(jv("totalNumberOfAuthors",j))
 
     # nb! next would be personAssociation, but data addition done last, see below
@@ -205,9 +193,7 @@ def parsejson(jsondata,keywords,metricdata,verbose):
     managingOrganisationalUnit_name = None
     if "managingOrganisationalUnit" in j:
       managingOrganisationalUnit_uuid = j["managingOrganisationalUnit"]["uuid"]
-      if "name" in j["managingOrganisationalUnit"]:
-        for m in j["managingOrganisationalUnit"]["name"]:
-          managingOrganisationalUnit_name = m["value"]
+      managingOrganisationalUnit_name = jvs_value("name",j["managingOrganisationalUnit"])
     item["managingOrganisationalUnit_uuid"] = managingOrganisationalUnit_uuid
     item["managingOrganisationalUnit_name"] = managingOrganisationalUnit_name
 
@@ -223,12 +209,9 @@ def parsejson(jsondata,keywords,metricdata,verbose):
       if "title" in a:
         journalAssociation_title = a["title"]["value"]
       if "journal" in a:
-        b = a["journal"]
-        if "type" in b:
-          for c in b["type"]:
-            journalAssociation_journal_type = c["value"]
-        if "uuid" in b:
-          journal_uuid = b["uuid"]
+        journalAssociation_journal_type = jvs_value("type",a["journal"])
+        if "uuid" in a["journal"]:
+          journal_uuid = a["journal"]["uuid"]
     item["journalAssociation_issn"] = journalAssociation_issn
     item["journalAssociation_title"] = journalAssociation_title
     item["journalAssociation_journal_type"] = journalAssociation_journal_type
@@ -255,11 +238,7 @@ def parsejson(jsondata,keywords,metricdata,verbose):
             item["isbns"] += ","
           item["isbns"] += isbn.strip()
 
-    openAccessPermission = None
-    if "openAccessPermission" in j:
-      for a in j["openAccessPermission"]:
-        openAccessPermission = a["value"]
-    item["openAccessPermission"] = openAccessPermission
+    item["openAccessPermission"] = jvs_value("openAccessPermission",j)
 
     # keywords pivot
     # - to title: keywordGroups.keywords.value => compromise this with setting value since there is no guarantee a keyword exists for all research-outputs
