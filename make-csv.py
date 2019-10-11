@@ -24,11 +24,18 @@ import csv
 import json
 import re
 import configparser
+import datetime
+
+def makerow(columns,verbose):
+  rowheader = columns.copy()
+  rowheader.sort()
+  return rowheader
 
 def output(outputfile,items,verbose):
   # find the column names:
   columns = [ x for row in items for x in row.keys() ]
   columns = list(set(columns))
+  columns = makerow(columns,verbose)
 
   # write to outputfile (always)
   with open(outputfile, 'w', newline='', encoding="UTF-8") as f:
@@ -74,7 +81,7 @@ def jv(objectname,jsonitem):
   return value
 
 # go thru given JSON. Look for bits were interested in and write to output file (CSV)
-def parsejson(jsondata,keywords,verbose):
+def parsejson(jsondata,keywords,metricdata,verbose):
   items = []
   for j in jsondata:
     item = {}
@@ -117,13 +124,10 @@ def parsejson(jsondata,keywords,verbose):
           language = None
     item["language"] = language
 
-    abstract_formatted = None
     abstract_value = None
     if "abstract" in j:
       for a in j["abstract"]:
-        abstract_formatted = a["formatted"]
         abstract_value = a["value"]
-    item["abstract_formatted"] = abstract_formatted
     item["abstract_value"] = abstract_value
 
     publicationStatuses_publicationDate_year = None
@@ -196,6 +200,8 @@ def parsejson(jsondata,keywords,verbose):
         journalAssociation_issn_value = a["issn"]["value"]
       if "journal" in a:
         b = a["journal"]
+        if "uuid" in b:
+          journalAssociation_journal_uuid = b["uuid"]
         if "name" in b:
           for c in b["name"]:
             journalAssociation_journal_name_value = c["value"]
@@ -209,6 +215,23 @@ def parsejson(jsondata,keywords,verbose):
     item["journalAssociation_journal_type_value"] = journalAssociation_journal_type_value
     item["journalAssociation_journal_uuid"] = journalAssociation_journal_uuid
     item["journalAssociation_title_value"] = journalAssociation_title_value
+
+    # get scopusMetrics from journals
+    metrics = ["sjr","snip","citescore"] # to config?
+    years = 5 # to config?
+    if journalAssociation_journal_uuid in metricdata:
+      print("journal UUID: %s metricdata: %s"%(journalAssociation_journal_uuid,metricdata[journalAssociation_journal_uuid],))
+    else:
+      print("journal UUID: %s NO METRICDATA!!!"%(journalAssociation_journal_uuid,))
+    for m in metrics:
+      for y in range(1, years+1):
+        mkey = m+"_year-"+str(y)
+        # this will make sure column exists in every row
+        item["metrics_"+mkey] = None
+        # get the actual value if exists
+        if journalAssociation_journal_uuid in metricdata:
+          if mkey in metricdata[journalAssociation_journal_uuid]:
+            item["metrics_"+mkey] = metricdata[journalAssociation_journal_uuid][mkey]
 
     item["totalNumberOfAuthors"] = str(jv("totalNumberOfAuthors",j))
     item["totalScopusCitations"] = jv("totalScopusCitations",j)
@@ -238,9 +261,7 @@ def parsejson(jsondata,keywords,verbose):
         personAssociations_name_lastName = None
         personAssociations_organisationalUnits_name_value = None
         personAssociations_organisationalUnits_uuid = None
-        personAssociations_person_name_value = None
         personAssociations_person_uuid = ""
-        personAssociations_externalPerson_name_value = None
         personAssociations_externalPerson_uuid = ""
         personAssociations_personRole_value = None
         if "country" in a:
@@ -262,14 +283,8 @@ def parsejson(jsondata,keywords,verbose):
                 personAssociations_organisationalUnits_name_value = c["value"]
             personAssociations_organisationalUnits_uuid = b["uuid"]
         if "person" in a:
-          if "name" in a["person"]:
-            for c in a["person"]["name"]:
-              personAssociations_person_name_value = c["value"]
           personAssociations_person_uuid = a["person"]["uuid"]
         if "externalPerson" in a:
-          if "name" in a["externalPerson"]:
-            for c in a["externalPerson"]["name"]:
-              personAssociations_externalPerson_name_value = c["value"]
           personAssociations_externalPerson_uuid = a["externalPerson"]["uuid"]
         if "personRole" in a:
           for b in a["personRole"]:
@@ -282,9 +297,7 @@ def parsejson(jsondata,keywords,verbose):
         item["personAssociations_name_lastName"] = personAssociations_name_lastName
         item["personAssociations_organisationalUnits_name_value"] = personAssociations_organisationalUnits_name_value
         item["personAssociations_organisationalUnits_uuid"] = personAssociations_organisationalUnits_uuid
-        item["personAssociations_person_name_value"] = personAssociations_person_name_value
         item["personAssociations_person_uuid"] = personAssociations_person_uuid
-        item["personAssociations_externalPerson_name_value"] = personAssociations_externalPerson_name_value
         item["personAssociations_externalPerson_uuid"] = personAssociations_externalPerson_uuid
         item["personAssociations_personRole_value"] = personAssociations_personRole_value
         # and append here (not at "root" loop end)
@@ -299,6 +312,31 @@ def parsejson(jsondata,keywords,verbose):
       items.append(item.copy()) #nb! make a copy (not reference)
 
   return items
+
+def parsemetrics(journaldata,verbose):
+  fromyear = datetime.datetime.now().year
+  if verbose>1: print("Parse metrics from year %d "%(fromyear,))
+
+  metrics = ["sjr","snip","citescore"] # to config?
+  years = 5 # to config?
+
+  metricdata = {}
+  for jo in journaldata:
+    if verbose>2: print("  >>> metrics from journal %s "%(jo["uuid"],))
+    metric = {}
+    metric["uuid"] = jo["uuid"]
+    if "scopusMetrics" in jo:
+      if verbose>2: print("  >>> metrics from journal %s metrics %s"%(jo["uuid"],jo["scopusMetrics"],))
+      for m in metrics:
+        for a in jo["scopusMetrics"]:
+          for y in range(1, years+1):
+            if a["year"] == fromyear-y:
+              if verbose>2: print("  >>> metrics from journal %s year %d"%(jo["uuid"],a["year"],))
+              if m in a:
+                metric[m+"_year-"+str(y)] = a[m]
+    if verbose>2: print("  >>> metrics from journal %s metric %s"%(jo["uuid"],metric,))
+    metricdata[jo["uuid"]] = metric.copy()
+  return metricdata
 
 def readjson(file,verbose):
   if verbose: print("Read JSON from '%s'"%(file,))
@@ -340,6 +378,7 @@ def main(argv):
   locale = None
   verbose = 1 # default minor messages
   inputfile = cfg.get(cfgsec,"researchfile") if cfg.has_option(cfgsec,"researchfile") else None
+  journalfile = cfg.get(cfgsec,"journalfile") if cfg.has_option(cfgsec,"journalfile") else None
   outputfile = cfg.get(cfgsec,"outputfile") if cfg.has_option(cfgsec,"outputfile") else None
 
   keywords = None
@@ -366,7 +405,10 @@ def main(argv):
   if not outputfile: exit("No output file. Exit.")
 
   jsondata = readjson(inputfile,verbose)
-  items = parsejson(jsondata,keywords,verbose)
+  journaldata = readjson(journalfile,verbose)
+
+  metricdata = parsemetrics(journaldata,verbose)
+  items = parsejson(jsondata,keywords,metricdata,verbose)
   output(outputfile,items,verbose)
   
 if __name__ == "__main__":
