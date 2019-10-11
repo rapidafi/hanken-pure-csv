@@ -28,8 +28,8 @@ import configparser
 from datetime import datetime
 currentyear = datetime.now().year
 
-def makerow(columns,verbose):
-  rowheader = columns.copy()
+def makerow(verbose):
+  #rowheader = columns.copy()
   #rowheader.sort()
   rowheader = [
     "uuid",
@@ -73,9 +73,15 @@ def makerow(columns,verbose):
     "keyword_rinnakkaistallennettukytkin",
     "keyword_YhteisjulkaisuKVKytkin",
     "keyword_YhteisjulkaisuYritysKytkin"
-    #keyword_field511
-    #keyword_field512
-    #    etc
+    #
+    ,"keyword_field511"
+    ,"keyword_field512"
+    ,"keyword_field513"
+    ,"keyword_field517"
+    ,"keyword_field518"
+    ,"keyword_field112"
+    ,"keyword_field113"
+    #
     ,"metrics_2014_citescore"
     ,"metrics_2014_sjr"
     ,"metrics_2014_snip"
@@ -96,9 +102,9 @@ def makerow(columns,verbose):
 
 def output(outputfile,items,verbose):
   # find the column names:
-  columns = [ x for row in items for x in row.keys() ]
-  columns = list(set(columns))
-  columns = makerow(columns,verbose)
+  #columns = [ x for row in items for x in row.keys() ]
+  #columns = list(set(columns))
+  columns = makerow(verbose)
 
   # write to outputfile (always)
   with open(outputfile, 'w', newline='', encoding="UTF-8") as f:
@@ -111,30 +117,6 @@ def output(outputfile,items,verbose):
       writer.writerow(row)
 
   if verbose: print("Output written to file '%s' with %d columns and %d rows"%(outputfile,len(columns),count,))
-
-# Helper function for Haris/Pure JSON regarding keywords
-def getkeywordvalue(keyword,item,verbose):
-  (title,value) = (None,None)
-  if "keywordGroups" in item:
-    for k in item["keywordGroups"]:
-      if "type" in k:
-        for t in k["type"]:
-          title = t["value"]
-      if "keywords" in k:
-        for w in k["keywords"]:
-          if "uri" in w:
-            # special case for "core"
-            if keyword == "core" and "dk/atira/pure/core/keywords/" in w["uri"]:
-              if "value" in w:
-                value = w["value"]
-                value = value.split(" ")[0]
-                value = value.replace(",","") # remove comma "," if it exists, e.g. "612,1"->"6121"
-                if re.search("^[0-9]+$", value):
-                  if verbose>1: print("%s core keyword %s"%(item["uuid"],value,))
-            elif "dk/atira/pure/keywords/"+keyword+"/" in w["uri"]:
-              value = w["uri"].split("/")[-1] # last index
-  
-  return (title,value)
 
 # Helper function for repeatedly used part of code
 def jv(objectname,jsonitem):
@@ -252,13 +234,9 @@ def parsejson(jsondata,keywords,metricdata,verbose):
     item["journalAssociation_journal_type"] = journalAssociation_journal_type
 
     item["volume"] = jv("volume",j)
-
     item["journalNumber"] = jv("journalNumber",j)
-
     item["pages"] = jv("pages",j)
-
     item["articleNumber"] = jv("articleNumber",j)
-
     item["edition"] = jv("edition",j)
 
     item["isbns"] = "" # nb! different from others!
@@ -287,10 +265,32 @@ def parsejson(jsondata,keywords,metricdata,verbose):
     # - to title: keywordGroups.keywords.value => compromise this with setting value since there is no guarantee a keyword exists for all research-outputs
     # - to value: keywordGroups.type.value
     for k in keywords:
-      (keyword_title,keyword_value) = getkeywordvalue(k,j,verbose)
+      keyword_value = None
+      if "keywordGroups" in j:
+        for a in j["keywordGroups"]:
+          if "keywords" in a:
+            for w in a["keywords"]:
+              if "uri" in w:
+                if "dk/atira/pure/keywords/"+k+"/" in w["uri"]:
+                  keyword_value = w["uri"].split("/")[-1] # last index
       item["keyword_"+k] = keyword_value
 
-    # TODO core keywords (tieteenalakoodit)
+    # core keywords (tieteenalakoodit)
+    for t in ["511","512","513","517","518","112","113"]:
+      item["keyword_field"+t] = None
+      if "keywordGroups" in j:
+        for a in j["keywordGroups"]:
+          if "keywords" in a:
+            for w in a["keywords"]:
+              if "uri" in w:
+                if "/dk/atira/pure/core/keywords/" in w["uri"]:
+                  if "value" in w:
+                    koodi = w["value"]
+                    koodi = koodi.split(" ")[0]
+                    koodi = koodi.replace(",","") # remove comma "," if it exists, e.g. "612,1"->"6121"
+                    if re.search("^"+t+"$", koodi):
+                      if verbose>2: print("%s tieteenalakoodi %s"%(j["uuid"],koodi,))
+                      item["keyword_field"+t] = w["value"]
 
     # get scopusMetrics from journals
     metrics = ["sjr","snip","citescore"] # to config?
@@ -304,8 +304,6 @@ def parsejson(jsondata,keywords,metricdata,verbose):
         if journal_uuid in metricdata:
           if mkey in metricdata[journal_uuid]:
             item["metrics_"+mkey] = metricdata[journal_uuid][mkey]
-
-    #item["totalScopusCitations"] = jv("totalScopusCitations",j)
     
     # nb! row multiplying data
     # so do this/these last
