@@ -45,6 +45,7 @@ def makerow(verbose):
     "publicationStatuses_publicationStatus",
     "workflow",
     "totalNumberOfAuthors",
+    "numberOfInternalAuthors",
     "personAssociations_person_uuid",
     "personAssociations_name_lastName",
     "personAssociations_name_firstName",
@@ -289,28 +290,34 @@ def parsejson(jsondata,keywords,metricdata,verbose):
 
     # multiply rows per person!
     added_persons = False # keep track if nothing was added
+    item["numberOfInternalAuthors"] = jv("totalNumberOfAuthors",j)
+    if "personAssociations" in j:
+      for a in j["personAssociations"]:
+        if "externalPerson" in a:
+          item["numberOfInternalAuthors"] -= 1
+
     if "personAssociations" in j:
       for a in j["personAssociations"]:
         added_persons = True # .. will be added
         # reset values here
-        personAssociations_country_value = ""
-        personAssociations_externalOrganisations_name_value = None
+        personAssociations_country = ""
+        personAssociations_externalOrganisations_name = None
         personAssociations_externalOrganisations_uuid = None
         personAssociations_name_firstName = None
         personAssociations_name_lastName = None
-        personAssociations_organisationalUnits_name_value = None
+        personAssociations_organisationalUnits_name = None
         personAssociations_organisationalUnits_uuid = None
         personAssociations_person_uuid = ""
         personAssociations_externalPerson_uuid = ""
-        personAssociations_personRole_value = None
+        personAssociations_personRole = None
         if "country" in a:
           for b in a["country"]:
-            personAssociations_country_value = b["value"]
+            personAssociations_country = b["value"]
         if "externalOrganisations" in a:
           for b in a["externalOrganisations"]:
             if "name" in b:
               for c in b["name"]:
-                personAssociations_externalOrganisations_name_value = c["value"]
+                personAssociations_externalOrganisations_name = c["value"]
             personAssociations_externalOrganisations_uuid = b["uuid"]
         if "name" in a:
           personAssociations_name_firstName = a["name"]["firstName"]
@@ -319,7 +326,7 @@ def parsejson(jsondata,keywords,metricdata,verbose):
           for b in a["organisationalUnits"]:
             if "name" in b:
               for c in b["name"]:
-                personAssociations_organisationalUnits_name_value = c["value"]
+                personAssociations_organisationalUnits_name = c["value"]
             personAssociations_organisationalUnits_uuid = b["uuid"]
         if "person" in a:
           personAssociations_person_uuid = a["person"]["uuid"]
@@ -327,18 +334,18 @@ def parsejson(jsondata,keywords,metricdata,verbose):
           personAssociations_externalPerson_uuid = a["externalPerson"]["uuid"]
         if "personRole" in a:
           for b in a["personRole"]:
-            personAssociations_personRole_value = b["value"]
+            personAssociations_personRole = b["value"]
         # add person values to item here, overwrite if 1+ round
-        item["personAssociations_country_value"] = personAssociations_country_value
-        item["personAssociations_externalOrganisations_name_value"] = personAssociations_externalOrganisations_name_value
+        item["personAssociations_country"] = personAssociations_country
+        item["personAssociations_externalOrganisations_name"] = personAssociations_externalOrganisations_name
         item["personAssociations_externalOrganisations_uuid"] = personAssociations_externalOrganisations_uuid
         item["personAssociations_name_firstName"] = personAssociations_name_firstName
         item["personAssociations_name_lastName"] = personAssociations_name_lastName
-        item["personAssociations_organisationalUnits_name_value"] = personAssociations_organisationalUnits_name_value
+        item["personAssociations_organisationalUnits_name"] = personAssociations_organisationalUnits_name
         item["personAssociations_organisationalUnits_uuid"] = personAssociations_organisationalUnits_uuid
         item["personAssociations_person_uuid"] = personAssociations_person_uuid
         item["personAssociations_externalPerson_uuid"] = personAssociations_externalPerson_uuid
-        item["personAssociations_personRole_value"] = personAssociations_personRole_value
+        item["personAssociations_personRole"] = personAssociations_personRole
         # and append here (not at "root" loop end)
         items.append(item.copy()) #nb! make a copy (not reference)
     # nb! normal addition for person (and such) would be at this level
