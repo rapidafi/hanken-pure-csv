@@ -24,11 +24,74 @@ import csv
 import json
 import re
 import configparser
-import datetime
+
+from datetime import datetime
+currentyear = datetime.now().year
 
 def makerow(columns,verbose):
   rowheader = columns.copy()
-  rowheader.sort()
+  #rowheader.sort()
+  rowheader = [
+    "uuid",
+    "electronicVersions_doi",
+    "title",
+    "abstract",
+    "language",
+    "type",
+    "category",
+    "assessmentType",
+    "publicationStatuses_publicationDate_year",
+    "publicationStatuses_current",
+    "publicationStatuses_publicationStatus",
+    "workflow",
+    "totalNumberOfAuthors",
+    "personAssociations_person_uuid",
+    "personAssociations_name_lastName",
+    "personAssociations_name_firstName",
+    "personAssociations_personRole",
+    "personAssociations_organisationalUnits_uuid",
+    "personAssociations_organisationalUnits_name",
+    "personAssociations_country",
+    "personAssociations_externalPerson_uuid",
+    "personAssociations_externalOrganisations_uuid",
+    "personAssociations_externalOrganisations_name",
+    "managingOrganisationalUnit_uuid",
+    "managingOrganisationalUnit_name",
+    "journalAssociation_issn",
+    "journalAssociation_title",
+    "journalAssociation_journal_type",
+    "volume",
+    "journalNumber",
+    "pages",
+    "articleNumber",
+    "edition",
+    "isbns",
+    "openAccessPermission",
+    "keyword_avoinsaatavuuskoodi",
+    "keyword_JulkaisunKansainvalisyysKytkin",
+    "keyword_KOTA",
+    "keyword_rinnakkaistallennettukytkin",
+    "keyword_YhteisjulkaisuKVKytkin",
+    "keyword_YhteisjulkaisuYritysKytkin"
+    #keyword_field511
+    #keyword_field512
+    #    etc
+    ,"metrics_2014_citescore"
+    ,"metrics_2014_sjr"
+    ,"metrics_2014_snip"
+    ,"metrics_2015_citescore"
+    ,"metrics_2015_sjr"
+    ,"metrics_2015_snip"
+    ,"metrics_2016_citescore"
+    ,"metrics_2016_sjr"
+    ,"metrics_2016_snip"
+    ,"metrics_2017_citescore"
+    ,"metrics_2017_sjr"
+    ,"metrics_2017_snip"
+    ,"metrics_2018_citescore"
+    ,"metrics_2018_sjr"
+    ,"metrics_2018_snip"
+  ]
   return rowheader
 
 def output(outputfile,items,verbose):
@@ -82,33 +145,27 @@ def jv(objectname,jsonitem):
 
 # go thru given JSON. Look for bits were interested in and write to output file (CSV)
 def parsejson(jsondata,keywords,metricdata,verbose):
+  global currentyear
+
   items = []
   for j in jsondata:
     item = {}
     item["uuid"] = j["uuid"]
 
-    item["type"] = jv("type",j)[0]["value"] # only one or first will suffice
+    electronicVersions_doi = None
+    if "electronicVersions" in j:
+      for a in j["electronicVersions"]:
+        if "doi" in a:
+          electronicVersions_doi = a["doi"]
+    item["electronicVersions_doi"] = electronicVersions_doi
+
     item["title"] = jv("title",j)
 
-    assessmentType_value = None
-    if "assessmentType" in j:
-      for a in j["assessmentType"]:
-        assessmentType_value = a["value"]
-    item["assessmentType_value"] = assessmentType_value
-
-    openAccessPermission_value = None
-    if "openAccessPermission" in j:
-      for a in j["openAccessPermission"]:
-        openAccessPermission_value = a["value"]
-    item["openAccessPermission_value"] = openAccessPermission_value
-
-    item["volume"] = jv("volume",j)
-
-    workflow = None
-    if "workflow" in j:
-      for a in j["workflow"]:
-        workflow = a["value"]
-    item["workflow"] = workflow
+    abstract = None
+    if "abstract" in j:
+      for a in j["abstract"]:
+        abstract = a["value"]
+    item["abstract"] = abstract
 
     language = None
     if "language" in j:
@@ -124,55 +181,86 @@ def parsejson(jsondata,keywords,metricdata,verbose):
           language = None
     item["language"] = language
 
-    abstract_value = None
-    if "abstract" in j:
-      for a in j["abstract"]:
-        abstract_value = a["value"]
-    item["abstract_value"] = abstract_value
+    item["type"] = jv("type",j)[0]["value"] # only one or first will suffice
+
+    category = None
+    if "category" in j:
+      for a in j["category"]:
+        category = a["value"]
+    item["category"] = category
+
+    assessmentType = None
+    if "assessmentType" in j:
+      for a in j["assessmentType"]:
+        assessmentType = a["value"]
+    item["assessmentType"] = assessmentType
 
     publicationStatuses_publicationDate_year = None
     publicationStatuses_current = None
-    publicationStatuses_publicationStatus_value = None
+    publicationStatuses_publicationStatus = None
     if "publicationStatuses" in j:
       for a in j["publicationStatuses"]:
         publicationStatuses_publicationDate_year = a["publicationDate"]["year"]
         publicationStatuses_current = a["current"]
         if "publicationStatus" in a:
           for b in a["publicationStatus"]:
-            publicationStatuses_publicationStatus_value = b["value"]
+            publicationStatuses_publicationStatus = b["value"]
     item["publicationStatuses_publicationDate_year"] = publicationStatuses_publicationDate_year
     item["publicationStatuses_current"] = publicationStatuses_current
-    item["publicationStatuses_publicationStatus_value"] = publicationStatuses_publicationStatus_value
+    item["publicationStatuses_publicationStatus"] = publicationStatuses_publicationStatus
+
+    workflow = None
+    if "workflow" in j:
+      for a in j["workflow"]:
+        workflow = a["value"]
+    item["workflow"] = workflow
+
+    item["totalNumberOfAuthors"] = str(jv("totalNumberOfAuthors",j))
+
+    # nb! next would be personAssociation, but data addition done last, see below
 
     managingOrganisationalUnit_uuid = None
-    managingOrganisationalUnit_name_value = None
+    managingOrganisationalUnit_name = None
     if "managingOrganisationalUnit" in j:
       managingOrganisationalUnit_uuid = j["managingOrganisationalUnit"]["uuid"]
       if "name" in j["managingOrganisationalUnit"]:
         for m in j["managingOrganisationalUnit"]["name"]:
-          managingOrganisationalUnit_name_value = m["value"]
+          managingOrganisationalUnit_name = m["value"]
     item["managingOrganisationalUnit_uuid"] = managingOrganisationalUnit_uuid
-    item["managingOrganisationalUnit_name_value"] = managingOrganisationalUnit_name_value
+    item["managingOrganisationalUnit_name"] = managingOrganisationalUnit_name
+
+    journalAssociation_issn = None
+    journalAssociation_title = None
+    journalAssociation_journal_type = None
+    # for scopus metrics fetching:
+    journal_uuid = None
+    if "journalAssociation" in j:
+      a = j["journalAssociation"]
+      if "issn" in a:
+        journalAssociation_issn = a["issn"]["value"]
+      if "title" in a:
+        journalAssociation_title = a["title"]["value"]
+      if "journal" in a:
+        b = a["journal"]
+        if "type" in b:
+          for c in b["type"]:
+            journalAssociation_journal_type = c["value"]
+        if "uuid" in b:
+          journal_uuid = b["uuid"]
+    item["journalAssociation_issn"] = journalAssociation_issn
+    item["journalAssociation_title"] = journalAssociation_title
+    item["journalAssociation_journal_type"] = journalAssociation_journal_type
+
+    item["volume"] = jv("volume",j)
+
+    item["journalNumber"] = jv("journalNumber",j)
+
+    item["pages"] = jv("pages",j)
 
     item["articleNumber"] = jv("articleNumber",j)
 
-    category_value = None
-    if "category" in j:
-      for a in j["category"]:
-        category_value = a["value"]
-    item["category_value"] = category_value
-
     item["edition"] = jv("edition",j)
-    item["pages"] = jv("pages",j)
-    item["journalNumber"] = jv("journalNumber",j)
 
-    electronicVersions_doi = None
-    if "electronicVersions" in j:
-      for a in j["electronicVersions"]:
-        if "doi" in a:
-          electronicVersions_doi = a["doi"]
-    item["electronicVersions_doi"] = electronicVersions_doi
-    
     item["isbns"] = "" # nb! different from others!
     allisbns = []
     if "isbns" in j:
@@ -189,61 +277,35 @@ def parsejson(jsondata,keywords,metricdata,verbose):
             item["isbns"] += ","
           item["isbns"] += isbn.strip()
 
-    journalAssociation_issn_value = None
-    journalAssociation_journal_name_value = None
-    journalAssociation_journal_type_value = None
-    journalAssociation_journal_uuid = None
-    journalAssociation_title_value = None
-    if "journalAssociation" in j:
-      a = j["journalAssociation"]
-      if "issn" in a:
-        journalAssociation_issn_value = a["issn"]["value"]
-      if "journal" in a:
-        b = a["journal"]
-        if "uuid" in b:
-          journalAssociation_journal_uuid = b["uuid"]
-        if "name" in b:
-          for c in b["name"]:
-            journalAssociation_journal_name_value = c["value"]
-        if "type" in b:
-          for c in b["type"]:
-            journalAssociation_journal_type_value = c["value"]
-      if "title" in a:
-        journalAssociation_title_value = a["title"]["value"]
-    item["journalAssociation_issn_value"] = journalAssociation_issn_value
-    item["journalAssociation_journal_name_value"] = journalAssociation_journal_name_value
-    item["journalAssociation_journal_type_value"] = journalAssociation_journal_type_value
-    item["journalAssociation_journal_uuid"] = journalAssociation_journal_uuid
-    item["journalAssociation_title_value"] = journalAssociation_title_value
+    openAccessPermission = None
+    if "openAccessPermission" in j:
+      for a in j["openAccessPermission"]:
+        openAccessPermission = a["value"]
+    item["openAccessPermission"] = openAccessPermission
 
-    # get scopusMetrics from journals
-    metrics = ["sjr","snip","citescore"] # to config?
-    years = 5 # to config?
-    if journalAssociation_journal_uuid in metricdata:
-      print("journal UUID: %s metricdata: %s"%(journalAssociation_journal_uuid,metricdata[journalAssociation_journal_uuid],))
-    else:
-      print("journal UUID: %s NO METRICDATA!!!"%(journalAssociation_journal_uuid,))
-    for m in metrics:
-      for y in range(1, years+1):
-        mkey = m+"_year-"+str(y)
-        # this will make sure column exists in every row
-        item["metrics_"+mkey] = None
-        # get the actual value if exists
-        if journalAssociation_journal_uuid in metricdata:
-          if mkey in metricdata[journalAssociation_journal_uuid]:
-            item["metrics_"+mkey] = metricdata[journalAssociation_journal_uuid][mkey]
-
-    item["totalNumberOfAuthors"] = str(jv("totalNumberOfAuthors",j))
-    item["totalScopusCitations"] = jv("totalScopusCitations",j)
-
-    #TODO scopusMetrics
-    
     # keywords pivot
     # - to title: keywordGroups.keywords.value => compromise this with setting value since there is no guarantee a keyword exists for all research-outputs
     # - to value: keywordGroups.type.value
     for k in keywords:
       (keyword_title,keyword_value) = getkeywordvalue(k,j,verbose)
       item["keyword_"+k] = keyword_value
+
+    # TODO core keywords (tieteenalakoodit)
+
+    # get scopusMetrics from journals
+    metrics = ["sjr","snip","citescore"] # to config?
+    years = 5 # to config?
+    for m in metrics:
+      for y in range(currentyear-years, currentyear+1):
+        mkey = str(y)+"_"+m
+        # this will make sure column exists in every row
+        item["metrics_"+mkey] = None
+        # get the actual value if exists
+        if journal_uuid in metricdata:
+          if mkey in metricdata[journal_uuid]:
+            item["metrics_"+mkey] = metricdata[journal_uuid][mkey]
+
+    #item["totalScopusCitations"] = jv("totalScopusCitations",j)
     
     # nb! row multiplying data
     # so do this/these last
@@ -314,26 +376,27 @@ def parsejson(jsondata,keywords,metricdata,verbose):
   return items
 
 def parsemetrics(journaldata,verbose):
-  fromyear = datetime.datetime.now().year
-  if verbose>1: print("Parse metrics from year %d "%(fromyear,))
-
+  global currentyear
   metrics = ["sjr","snip","citescore"] # to config?
   years = 5 # to config?
+
+  fromyear = currentyear-years
+  if verbose>1: print("Parse metrics from year %d to %d"%(fromyear,currentyear-1,))
 
   metricdata = {}
   for jo in journaldata:
     if verbose>2: print("  >>> metrics from journal %s "%(jo["uuid"],))
     metric = {}
-    metric["uuid"] = jo["uuid"]
+    metric["uuid"] = jo["uuid"] #redundant (dev/debug)
     if "scopusMetrics" in jo:
       if verbose>2: print("  >>> metrics from journal %s metrics %s"%(jo["uuid"],jo["scopusMetrics"],))
       for m in metrics:
         for a in jo["scopusMetrics"]:
-          for y in range(1, years+1):
-            if a["year"] == fromyear-y:
-              if verbose>2: print("  >>> metrics from journal %s year %d"%(jo["uuid"],a["year"],))
+          for y in range(fromyear, currentyear):
+            if a["year"] == y:
+              if verbose>2: print("  >>> metrics from journal %s metric %s year %d data %s"%(jo["uuid"],m,y,a,))
               if m in a:
-                metric[m+"_year-"+str(y)] = a[m]
+                metric[str(y)+"_"+m] = a[m]
     if verbose>2: print("  >>> metrics from journal %s metric %s"%(jo["uuid"],metric,))
     metricdata[jo["uuid"]] = metric.copy()
   return metricdata
