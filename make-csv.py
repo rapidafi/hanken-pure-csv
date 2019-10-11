@@ -290,11 +290,18 @@ def parsejson(jsondata,keywords,metricdata,verbose):
 
     # multiply rows per person!
     added_persons = False # keep track if nothing was added
+    # calculate numberOfInternalAuthors first so it copies fully for every row
     item["numberOfInternalAuthors"] = jv("totalNumberOfAuthors",j)
     if "personAssociations" in j:
       for a in j["personAssociations"]:
-        if "externalPerson" in a:
-          item["numberOfInternalAuthors"] -= 1
+        roleIsOK = False # test for role
+        if "personRole" in a:
+          for r in a["personRole"]: # nb! authors and editors
+            if r["value"] == "Author" or r["value"] == "Editor":
+              roleIsOK = True
+        if roleIsOK:
+          if "externalPerson" in a:
+            item["numberOfInternalAuthors"] -= 1
 
     if "personAssociations" in j:
       for a in j["personAssociations"]:
@@ -310,44 +317,54 @@ def parsejson(jsondata,keywords,metricdata,verbose):
         personAssociations_person_uuid = ""
         personAssociations_externalPerson_uuid = ""
         personAssociations_personRole = None
-        if "country" in a:
-          for b in a["country"]:
-            personAssociations_country = b["value"]
-        if "externalOrganisations" in a:
-          for b in a["externalOrganisations"]:
-            if "name" in b:
-              for c in b["name"]:
-                personAssociations_externalOrganisations_name = c["value"]
-            personAssociations_externalOrganisations_uuid = b["uuid"]
-        if "name" in a:
-          personAssociations_name_firstName = a["name"]["firstName"]
-          personAssociations_name_lastName = a["name"]["lastName"]
-        if "organisationalUnits" in a:
-          for b in a["organisationalUnits"]:
-            if "name" in b:
-              for c in b["name"]:
-                personAssociations_organisationalUnits_name = c["value"]
-            personAssociations_organisationalUnits_uuid = b["uuid"]
-        if "person" in a:
-          personAssociations_person_uuid = a["person"]["uuid"]
-        if "externalPerson" in a:
-          personAssociations_externalPerson_uuid = a["externalPerson"]["uuid"]
+
+        roleIsOK = False # test for role
         if "personRole" in a:
-          for b in a["personRole"]:
-            personAssociations_personRole = b["value"]
-        # add person values to item here, overwrite if 1+ round
-        item["personAssociations_country"] = personAssociations_country
-        item["personAssociations_externalOrganisations_name"] = personAssociations_externalOrganisations_name
-        item["personAssociations_externalOrganisations_uuid"] = personAssociations_externalOrganisations_uuid
-        item["personAssociations_name_firstName"] = personAssociations_name_firstName
-        item["personAssociations_name_lastName"] = personAssociations_name_lastName
-        item["personAssociations_organisationalUnits_name"] = personAssociations_organisationalUnits_name
-        item["personAssociations_organisationalUnits_uuid"] = personAssociations_organisationalUnits_uuid
-        item["personAssociations_person_uuid"] = personAssociations_person_uuid
-        item["personAssociations_externalPerson_uuid"] = personAssociations_externalPerson_uuid
-        item["personAssociations_personRole"] = personAssociations_personRole
-        # and append here (not at "root" loop end)
-        items.append(item.copy()) #nb! make a copy (not reference)
+          for r in a["personRole"]: # nb! authors and editors
+            if r["value"] == "Author" or r["value"] == "Editor":
+              roleIsOK = True
+        if roleIsOK:
+          if "country" in a:
+            for b in a["country"]:
+              personAssociations_country = b["value"]
+          if "externalOrganisations" in a:
+            for b in a["externalOrganisations"]:
+              if "name" in b:
+                for c in b["name"]:
+                  personAssociations_externalOrganisations_name = c["value"]
+              personAssociations_externalOrganisations_uuid = b["uuid"]
+          if "name" in a:
+            personAssociations_name_firstName = a["name"]["firstName"]
+            personAssociations_name_lastName = a["name"]["lastName"]
+          if "organisationalUnits" in a:
+            for b in a["organisationalUnits"]:
+              if "name" in b:
+                for c in b["name"]:
+                  personAssociations_organisationalUnits_name = c["value"]
+              personAssociations_organisationalUnits_uuid = b["uuid"]
+          if "person" in a:
+            personAssociations_person_uuid = a["person"]["uuid"]
+          if "externalPerson" in a:
+            personAssociations_externalPerson_uuid = a["externalPerson"]["uuid"]
+          if "personRole" in a:
+            for b in a["personRole"]:
+              personAssociations_personRole = b["value"]
+          # add person values to item here, overwrite if 1+ round
+          item["personAssociations_country"] = personAssociations_country
+          item["personAssociations_externalOrganisations_name"] = personAssociations_externalOrganisations_name
+          item["personAssociations_externalOrganisations_uuid"] = personAssociations_externalOrganisations_uuid
+          item["personAssociations_name_firstName"] = personAssociations_name_firstName
+          item["personAssociations_name_lastName"] = personAssociations_name_lastName
+          item["personAssociations_organisationalUnits_name"] = personAssociations_organisationalUnits_name
+          item["personAssociations_organisationalUnits_uuid"] = personAssociations_organisationalUnits_uuid
+          item["personAssociations_person_uuid"] = personAssociations_person_uuid
+          item["personAssociations_externalPerson_uuid"] = personAssociations_externalPerson_uuid
+          item["personAssociations_personRole"] = personAssociations_personRole
+          # and append here (not at "root" loop end)
+          items.append(item.copy()) #nb! make a copy (not reference)
+        #/roleIsOK
+      #/
+    #/personAssociations
     # nb! normal addition for person (and such) would be at this level
 
     # normal "root" loop ending begins.
