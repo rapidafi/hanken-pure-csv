@@ -156,9 +156,9 @@ Once all mandatory JSON files are present a call to script called [make-csv.py](
 
 The columns chosen for result has been reduced in iterations. With no limitations there were over 300 columns and after collaborating iterations the column count has reduced to 64. There's still plenty to work around, ay.
 
-Command line arguments, all optional, for [make-csv.py](make-csv.py) are:
-
 TODO
+
+Command line arguments, all optional, for [make-csv.py](make-csv.py) are:
 
 -h or --help
 
