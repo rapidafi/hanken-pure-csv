@@ -66,20 +66,9 @@ TL;DR
 
 ```shell
 python get-pure.py research-outputs
-python get-pure.py organisational-units
-python get-pure.py persons
-python get-pure.py external-persons
 python get-pure.py journals
 # when source files are present:
-python make-csv.py [-i research-outputs.json] [-o research-outputs.csv]
-python make-csv.py -i persons.json [-o persons.csv]
-python make-csv.py -i external-persons.json
-python make-csv.py -i organisational-units.json
-python make-csv.py -i journals.json
-# make separate linking files:
-python make-csv-link.py [-b person]
-python make-csv-link.py -b organisation
-...
+python make-csv.py
 ```
 
 ## DOCUMENTATION
@@ -153,25 +142,19 @@ OPTIONS
 The following Pure API data is considered mandatory. These are also named in configuration template (example):
 
 * research-outputs
-* organisational-units
-* persons
 * journals
 
 The following data from Pure API was looked at but a decision was made not to include (no added value to result):
 
-* external-persons
-    - Data does not contain ORCID which would have been the only use.
-* classification-schemes
-    - Works as reference but no added value in data.
-* keyword-group-configurations
-    - Works as reference but no added value in data.
+* organisational-units
+* persons
 
 
 ### Produce CSV
 
-Once all mandatory JSON files are present a call to script called [make-csv.py](make-csv.py) can be made. The script loads research-outputs, organisational-units, persons and journals into memory and produces CSV files.
+Once all mandatory JSON files are present a call to script called [make-csv.py](make-csv.py) can be made. The script loads research-outputs and journals into memory and produces a CSV file.
 
-TODO
+The columns chosen for result has been reduced in iterations. With no limitations there were over 300 columns and after collaborating iterations the column count has reduced to 64. There's still plenty to work around, ay.
 
 Command line arguments, all optional, for [make-csv.py](make-csv.py) are:
 
@@ -181,48 +164,26 @@ TODO
 
 * shows short usage of script and exits
 
--K or --kota `<kota>`
-
-* filter value of research-outputs data to be included in result
-* _kota_ is a keyword within Pure and the value here is a look-up value
-* defaults to confiration value
-* recommended to use configuration value
-
 -L or --locale `<locale>`
 
 * locale to filter data
 * needed only if JSON data has locales (normally shouldn't)
 
--R or --research `<researchfile>`
+-r or --research `<researchfile>`
 
 * name of the JSON file with Pure research-outputs data
-* defaults to confiration value
-* recommended to use configuration value
+* defaults to configuration value
 
--O or --organisation `<organisationfile>`
-
-* name of the JSON file with Pure organisational-units data
-* defaults to confiration value
-* recommended to use configuration value
-
--P or --person `<personfile>`
-
-* name of the JSON file with Pure person data
-* defaults to confiration value
-* recommended to use configuration value
-
--J or --journal `<journalfile>`
+-j or --journal `<journalfile>`
 
 * name of the JSON file with Pure journal data
-* defaults to confiration value
-* recommended to use configuration value
+* defaults to configuration value
 
 -o or --output `<outputfile>`
 
 * name of the file where result is written
 * file will be overwritten if it exists
-* defaults to confiration value
-* recommended to use configuration value
+* defaults to configuration value
 
 -v or --verbose
 

@@ -420,7 +420,8 @@ OPTIONS
 -L, --locale <loc>  : locale to filter data
 
 Source files with defaults from configuration:
--i, --input <file>
+-r, --research <file>
+-j, --journal <file>
 
 Output file with default from configuration:
 -o, --output <file>
@@ -441,7 +442,7 @@ def main(argv):
   # default/configuration values
   locale = None
   verbose = 1 # default minor messages
-  inputfile = cfg.get(cfgsec,"researchfile") if cfg.has_option(cfgsec,"researchfile") else None
+  researchfile = cfg.get(cfgsec,"researchfile") if cfg.has_option(cfgsec,"researchfile") else None
   journalfile = cfg.get(cfgsec,"journalfile") if cfg.has_option(cfgsec,"journalfile") else None
   outputfile = cfg.get(cfgsec,"outputfile") if cfg.has_option(cfgsec,"outputfile") else None
 
@@ -451,7 +452,7 @@ def main(argv):
 
   # read possible arguments. all optional given that defaults suffice
   try:
-    opts, args = getopt.getopt(argv,"hL:i:o:vq",["help","locale=","input=","output=","verbose","quiet"])
+    opts, args = getopt.getopt(argv,"hL:r:j:o:vq",["help","locale=","research=","journal=","output=","verbose","quiet"])
   except getopt.GetoptError as err:
     print(err)
     sys.exit(2)
@@ -460,15 +461,17 @@ def main(argv):
       usage()
       sys.exit(0)
     elif opt in ("-L", "--locale"): locale = arg
-    elif opt in ("-i", "--input"): inputfile = arg
+    elif opt in ("-r", "--research"): researchfile = arg
+    elif opt in ("-j", "--journal"): journalfile = arg
     elif opt in ("-o", "--output"): outputfile = arg
     elif opt in ("-v", "--verbose"): verbose += 1
     elif opt in ("-q", "--quiet"): verbose -= 1
 
-  if not inputfile: exit("No input file. Exit.")
+  if not researchfile: exit("No research file. Exit.")
+  if not journalfile: exit("No journal file. Exit.")
   if not outputfile: exit("No output file. Exit.")
 
-  jsondata = readjson(inputfile,verbose)
+  jsondata = readjson(researchfile,verbose)
   journaldata = readjson(journalfile,verbose)
 
   metricdata = parsemetrics(journaldata,verbose)
