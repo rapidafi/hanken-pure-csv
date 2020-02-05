@@ -109,7 +109,7 @@ def output(outputfile,items,verbose):
 
   # write to outputfile (always)
   with open(outputfile, 'w', newline='', encoding="UTF-8") as f:
-    writer = csv.DictWriter(f, fieldnames=columns, delimiter=';', quotechar='"', extrasaction='ignore')
+    writer = csv.DictWriter(f, fieldnames=columns, delimiter=';', quotechar='"', quoting=csv.QUOTE_NONNUMERIC, extrasaction='ignore')
     writer.writeheader()
     count=0
     for row in items:
@@ -126,13 +126,14 @@ def jv(objectname,jsonitem):
   if objectname in jsonitem:
     value = jsonitem[objectname]
   return value
-# get "value" under an unnecessary list (xml to json conversion I suppose) from json with name
-def jvs_value(objectname,jsonitem):
+# get "value" under a list in a subelement of an object (list is for locales and we rely on one locale)
+def js_value(objectname,subname,jsonitem):
   value = None
   if objectname in jsonitem:
-    for a in jsonitem[objectname]: # on a rare occasion there may be many, return last
-      if "value" in a:
-        value = a["value"]
+    if subname in jsonitem[objectname]:
+      for a in jsonitem[objectname][subname]: # on a rare occasion there may be many, return last
+        if "value" in a:
+          value = a["value"]
   return value
 # get last part of objects subelements text value where value is separated by slash (/)
 def jpart(objectname,subname,jsonitem):
@@ -158,9 +159,9 @@ def parsejson(jsondata,keywords,metricdata,verbose):
           electronicVersions_doi = a["doi"]
     item["electronicVersions_doi"] = electronicVersions_doi
 
-    item["title"] = jv("title",j)
+    item["title"] = j["title"]["value"]
 
-    item["abstract"] = jvs_value("abstract",j)
+    item["abstract"] = js_value("abstract","text",j)
 
     language = None
     if "language" in j:
@@ -200,7 +201,7 @@ def parsejson(jsondata,keywords,metricdata,verbose):
     managingOrganisationalUnit_name = None
     if "managingOrganisationalUnit" in j:
       managingOrganisationalUnit_uuid = j["managingOrganisationalUnit"]["uuid"]
-      managingOrganisationalUnit_name = jvs_value("name",j["managingOrganisationalUnit"])
+      managingOrganisationalUnit_name = js_value("name","text",j["managingOrganisationalUnit"])
     item["managingOrganisationalUnit_uuid"] = managingOrganisationalUnit_uuid
     item["managingOrganisationalUnit_name"] = managingOrganisationalUnit_name
 
@@ -216,7 +217,8 @@ def parsejson(jsondata,keywords,metricdata,verbose):
       if "title" in a:
         journalAssociation_title = a["title"]["value"]
       if "journal" in a:
-        journalAssociation_journal_type = jvs_value("type",a["journal"])
+        if "type" in a["journal"]:
+          journalAssociation_journal_type = js_value("term","text",a["journal"]["type"])
         if "uuid" in a["journal"]:
           journal_uuid = a["journal"]["uuid"]
     item["journalAssociation_issn"] = journalAssociation_issn
@@ -253,30 +255,37 @@ def parsejson(jsondata,keywords,metricdata,verbose):
     for k in keywords:
       keyword_value = None
       if "keywordGroups" in j:
-        for a in j["keywordGroups"]:
-          if "keywords" in a:
-            for w in a["keywords"]:
-              if "uri" in w:
-                if "dk/atira/pure/keywords/"+k+"/" in w["uri"]:
-                  keyword_value = w["uri"].split("/")[-1] # last index
+        for g in j["keywordGroups"]:
+          if "keywordContainers" in g:
+            for c in g["keywordContainers"]:
+              if "structuredKeyword" in c:
+                s = c["structuredKeyword"]
+                if "uri" in s:
+                  if "dk/atira/pure/keywords/"+k+"/" in s["uri"]:
+                    keyword_value = s["uri"].split("/")[-1] # last index
       item["keyword_"+k] = keyword_value
 
     # core keywords (tieteenalakoodit)
     for t in ["511","512","513","517","518","112","113"]:
       item["keyword_field"+t] = None
       if "keywordGroups" in j:
-        for a in j["keywordGroups"]:
-          if "keywords" in a:
-            for w in a["keywords"]:
-              if "uri" in w:
-                if "/dk/atira/pure/core/keywords/" in w["uri"]:
-                  if "value" in w:
-                    koodi = w["value"]
-                    koodi = koodi.split(" ")[0]
-                    koodi = koodi.replace(",","") # remove comma "," if it exists, e.g. "612,1"->"6121"
-                    if re.search("^"+t+"$", koodi):
-                      if verbose>2: print("%s tieteenalakoodi %s"%(j["uuid"],koodi,))
-                      item["keyword_field"+t] = w["value"]
+        for g in j["keywordGroups"]:
+          if "keywordContainers" in g:
+            for c in g["keywordContainers"]:
+              if "structuredKeyword" in c:
+                s = c["structuredKeyword"]
+                if "uri" in s:
+                  if "/dk/atira/pure/core/keywords/" in s["uri"]:
+                    if "term" in s:
+                      if "text" in s["term"]:
+                        for w in s["term"]["text"]:
+                          if "value" in w:
+                            code_check = w["value"]
+                            code_check = code_check.split(" ")[0]
+                            code_check = code_check.replace(",","") # remove comma "," if it exists, e.g. "612,1"->"6121"
+                            if re.search("^"+t+"$", code_check):
+                              if verbose>2: print("%s tieteenalakoodi %s"%(j["uuid"],code_check,))
+                              item["keyword_field"+t] = w["value"]
 
     # get scopusMetrics from journals
     metrics = ["sjr","snip","citescore"] # to config?
@@ -313,16 +322,16 @@ def parsejson(jsondata,keywords,metricdata,verbose):
       for a in j["personAssociations"]:
         added_persons = True # .. will be added
         # reset values here
-        personAssociations_country = ""
-        personAssociations_externalOrganisations_name = None
-        personAssociations_externalOrganisations_uuid = None
+        personAssociations_personRole = None
+        personAssociations_person_uuid = ""
         personAssociations_name_firstName = None
         personAssociations_name_lastName = None
-        personAssociations_organisationalUnits_name = None
+        personAssociations_country = ""
         personAssociations_organisationalUnits_uuid = None
-        personAssociations_person_uuid = ""
+        personAssociations_organisationalUnits_name = None
         personAssociations_externalPerson_uuid = ""
-        personAssociations_personRole = None
+        personAssociations_externalOrganisations_uuid = None
+        personAssociations_externalOrganisations_name = None
 
         roleIsOK = False # test for role
         role = jpart("personRole","uri",a)
@@ -330,29 +339,23 @@ def parsejson(jsondata,keywords,metricdata,verbose):
         if role == "author" or role == "editor":
           roleIsOK = True
         if roleIsOK:
-          personAssociations_country = jpart("country","uri",a)
-          if "externalOrganisations" in a:
-            for b in a["externalOrganisations"]:
-              if "name" in b:
-                if "text" in b["name"]:
-                  for c in b["name"]["text"]:
-                    personAssociations_externalOrganisations_name = c["value"]
-              personAssociations_externalOrganisations_uuid = b["uuid"]
+          personAssociations_personRole = role
+          if "person" in a:
+            personAssociations_person_uuid = a["person"]["uuid"]
           if "name" in a:
             personAssociations_name_firstName = a["name"]["firstName"]
             personAssociations_name_lastName = a["name"]["lastName"]
+          personAssociations_country = jpart("country","uri",a)
           if "organisationalUnits" in a:
             for b in a["organisationalUnits"]:
-              if "name" in b:
-                if "text" in b["name"]:
-                  for c in b["name"]["text"]:
-                    personAssociations_organisationalUnits_name = c["value"]
               personAssociations_organisationalUnits_uuid = b["uuid"]
-          if "person" in a:
-            personAssociations_person_uuid = a["person"]["uuid"]
+              personAssociations_organisationalUnits_name = js_value("name","text",b)
           if "externalPerson" in a:
             personAssociations_externalPerson_uuid = a["externalPerson"]["uuid"]
-          personAssociations_personRole = role
+          if "externalOrganisations" in a:
+            for b in a["externalOrganisations"]:
+              personAssociations_externalOrganisations_uuid = b["uuid"]
+              personAssociations_externalOrganisations_name = js_value("name","text",b)
           # add person values to item here, overwrite if 1+ round
           item["personAssociations_country"] = personAssociations_country
           item["personAssociations_externalOrganisations_name"] = personAssociations_externalOrganisations_name
@@ -421,7 +424,6 @@ def usage():
 
 OPTIONS
 -h, --help          : this message and exit
--L, --locale <loc>  : locale to filter data
 
 Source files with defaults from configuration:
 -r, --research <file>
@@ -444,7 +446,6 @@ def main(argv):
   # continue w/ [cfgsec] config
 
   # default/configuration values
-  locale = None
   verbose = 1 # default minor messages
   researchfile = cfg.get(cfgsec,"researchfile") if cfg.has_option(cfgsec,"researchfile") else None
   journalfile = cfg.get(cfgsec,"journalfile") if cfg.has_option(cfgsec,"journalfile") else None
@@ -456,7 +457,7 @@ def main(argv):
 
   # read possible arguments. all optional given that defaults suffice
   try:
-    opts, args = getopt.getopt(argv,"hL:r:j:o:vq",["help","locale=","research=","journal=","output=","verbose","quiet"])
+    opts, args = getopt.getopt(argv,"hr:j:o:vq",["help","research=","journal=","output=","verbose","quiet"])
   except getopt.GetoptError as err:
     print(err)
     sys.exit(2)
@@ -464,7 +465,6 @@ def main(argv):
     if opt in ("-h", "--help"):
       usage()
       sys.exit(0)
-    elif opt in ("-L", "--locale"): locale = arg
     elif opt in ("-r", "--research"): researchfile = arg
     elif opt in ("-j", "--journal"): journalfile = arg
     elif opt in ("-o", "--output"): outputfile = arg
