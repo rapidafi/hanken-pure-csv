@@ -134,6 +134,13 @@ def jvs_value(objectname,jsonitem):
       if "value" in a:
         value = a["value"]
   return value
+# get last part of objects subelements text value where value is separated by slash (/)
+def jpart(objectname,subname,jsonitem):
+  lastpart = None
+  if objectname in jsonitem:
+    if subname in jsonitem[objectname]:
+      lastpart = jsonitem[objectname][subname].split("/")[-1] # last part of ".../../THIS"
+  return lastpart
 
 # go thru given JSON. Look for bits were interested in and write to output file (CSV)
 def parsejson(jsondata,keywords,metricdata,verbose):
@@ -157,21 +164,20 @@ def parsejson(jsondata,keywords,metricdata,verbose):
 
     language = None
     if "language" in j:
-      for a in j["language"]:
-        # nb! technically may be many but choose randomly last, then split with "_" i.e. "fi_FI" -> "fi"
-        language = a["uri"].split("/")[-1].split("_")[0]
-        # nb! there are some odd language values for ex. "/dk/atira/pure/core/languages/italian"?
-        if   language=="chinese":        language = "zh"
-        elif language=="italian":        language = "it"
-        elif language=="polish":         language = "pl"
-        elif language=="portuguese":     language = "pt"
-        if language == "und": # value 99 is not used for unknown
-          language = None
+      # nb! last part but then split with "_" i.e. "fi_FI" -> "fi"
+      language = jpart("language","uri",j).split("_")[0]
+      # nb! there are some odd language values for ex. "/dk/atira/pure/core/languages/italian"?
+      if   language=="chinese":        language = "zh"
+      elif language=="italian":        language = "it"
+      elif language=="polish":         language = "pl"
+      elif language=="portuguese":     language = "pt"
+      if language == "und": # value 99 is not used for unknown
+        language = None
     item["language"] = language
 
-    item["type"] = jv("type",j)[0]["value"] # only one or first will suffice
-    item["category"] = jvs_value("category",j)
-    item["assessmentType"] = jvs_value("assessmentType",j)
+    item["type"] = jpart("type","uri",j)
+    item["category"] = jpart("category","uri",j)
+    item["assessmentType"] = jpart("assessmentType","uri",j)
 
     publicationStatuses_publicationDate_year = None
     publicationStatuses_current = None
@@ -180,12 +186,12 @@ def parsejson(jsondata,keywords,metricdata,verbose):
       for a in j["publicationStatuses"]:
         publicationStatuses_publicationDate_year = a["publicationDate"]["year"]
         publicationStatuses_current = a["current"]
-        publicationStatuses_publicationStatus = jvs_value("publicationStatus",a)
+        publicationStatuses_publicationStatus = jpart("publicationStatus","uri",a)
     item["publicationStatuses_publicationDate_year"] = publicationStatuses_publicationDate_year
     item["publicationStatuses_current"] = publicationStatuses_current
     item["publicationStatuses_publicationStatus"] = publicationStatuses_publicationStatus
 
-    item["workflow"] = jvs_value("workflow",j)
+    item["workflow"] = jpart("workflow","workflowStep",j)
     item["totalNumberOfAuthors"] = str(jv("totalNumberOfAuthors",j))
 
     # nb! next would be personAssociation, but data addition done last, see below
@@ -239,7 +245,7 @@ def parsejson(jsondata,keywords,metricdata,verbose):
             item["isbns"] += ","
           item["isbns"] += isbn.strip()
 
-    item["openAccessPermission"] = jvs_value("openAccessPermission",j)
+    item["openAccessPermission"] = jpart("openAccessPermission","uri",j)
 
     # keywords pivot
     # - to title: keywordGroups.keywords.value => compromise this with setting value since there is no guarantee a keyword exists for all research-outputs
@@ -295,10 +301,10 @@ def parsejson(jsondata,keywords,metricdata,verbose):
     if "personAssociations" in j:
       for a in j["personAssociations"]:
         roleIsOK = False # test for role
-        if "personRole" in a:
-          for r in a["personRole"]: # nb! authors and editors
-            if r["value"] == "Author" or r["value"] == "Editor":
-              roleIsOK = True
+        role = jpart("personRole","uri",a)
+        # nb! authors and editors
+        if role == "author" or role == "editor":
+          roleIsOK = True
         if roleIsOK:
           if "externalPerson" in a:
             item["numberOfInternalAuthors"] -= 1
@@ -319,19 +325,18 @@ def parsejson(jsondata,keywords,metricdata,verbose):
         personAssociations_personRole = None
 
         roleIsOK = False # test for role
-        if "personRole" in a:
-          for r in a["personRole"]: # nb! authors and editors
-            if r["value"] == "Author" or r["value"] == "Editor":
-              roleIsOK = True
+        role = jpart("personRole","uri",a)
+        # nb! authors and editors
+        if role == "author" or role == "editor":
+          roleIsOK = True
         if roleIsOK:
-          if "country" in a:
-            for b in a["country"]:
-              personAssociations_country = b["value"]
+          personAssociations_country = jpart("country","uri",a)
           if "externalOrganisations" in a:
             for b in a["externalOrganisations"]:
               if "name" in b:
-                for c in b["name"]:
-                  personAssociations_externalOrganisations_name = c["value"]
+                if "text" in b["name"]:
+                  for c in b["name"]["text"]:
+                    personAssociations_externalOrganisations_name = c["value"]
               personAssociations_externalOrganisations_uuid = b["uuid"]
           if "name" in a:
             personAssociations_name_firstName = a["name"]["firstName"]
@@ -339,16 +344,15 @@ def parsejson(jsondata,keywords,metricdata,verbose):
           if "organisationalUnits" in a:
             for b in a["organisationalUnits"]:
               if "name" in b:
-                for c in b["name"]:
-                  personAssociations_organisationalUnits_name = c["value"]
+                if "text" in b["name"]:
+                  for c in b["name"]["text"]:
+                    personAssociations_organisationalUnits_name = c["value"]
               personAssociations_organisationalUnits_uuid = b["uuid"]
           if "person" in a:
             personAssociations_person_uuid = a["person"]["uuid"]
           if "externalPerson" in a:
             personAssociations_externalPerson_uuid = a["externalPerson"]["uuid"]
-          if "personRole" in a:
-            for b in a["personRole"]:
-              personAssociations_personRole = b["value"]
+          personAssociations_personRole = role
           # add person values to item here, overwrite if 1+ round
           item["personAssociations_country"] = personAssociations_country
           item["personAssociations_externalOrganisations_name"] = personAssociations_externalOrganisations_name

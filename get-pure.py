@@ -39,7 +39,7 @@ def load(secure,hostname,uri,api,locale,output,size,split,verbose):
   #     Pure API provides navigation links with params (full URI)
   #     we produce similar URI to begin with
   requri = 'https://%s%s/%s'%(hostname,uri,api,)
-  requri += '?size=%d&offset=%d'%(size,0,)
+  requri += '?navigationLink=true&size=%d&offset=%d'%(size,0,)
   if locale:
     requri += '&locale=%s'%(locale,)
   reqheaders = {'Accept': 'application/json'}
@@ -86,8 +86,8 @@ def load(secure,hostname,uri,api,locale,output,size,split,verbose):
     if verbose: show("index: "+str(index)+" with "+str(cnt)+" items (total "+str(result["count"])+")")
 
     # keep loading?
-    if "navigationLink" in result:
-      for nav in result["navigationLink"]: # an array for prev/next!
+    if "navigationLinks" in result:
+      for nav in result["navigationLinks"]: # an array for prev/next!
         if "ref" in nav and "href" in nav:
           if nav["ref"] == "next":
             requri = nav["href"]
@@ -153,7 +153,7 @@ def main(argv):
     elif opt in ("-u", "--uri"): uri = arg
     elif opt in ("-L", "--locale"): locale = arg
     elif opt in ("-o", "--output"): output = arg
-    elif opt in ("-s", "--size"): size = arg
+    elif opt in ("-s", "--size"): size = int(arg)
     elif opt in ("-S", "--split"): split = True
     elif opt in ("-v", "--verbose"): verbose += 1
     elif opt in ("-q", "--quiet"): verbose -= 1
