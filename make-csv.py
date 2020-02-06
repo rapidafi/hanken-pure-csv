@@ -534,7 +534,7 @@ def main(argv):
     elif opt in ("-r", "--research"): researchfile = arg
     elif opt in ("-j", "--journal"): journalfile = arg
     elif opt in ("-p", "--person"): personfile = arg
-    elif opt in ("-e", "--externalperson"): personfile = arg
+    elif opt in ("-e", "--externalperson"): externalpersonfile = arg
     elif opt in ("-o", "--output"): outputfile = arg
     elif opt in ("-v", "--verbose"): verbose += 1
     elif opt in ("-q", "--quiet"): verbose -= 1

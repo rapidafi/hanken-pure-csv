@@ -67,6 +67,8 @@ TL;DR
 ```shell
 python get-pure.py research-outputs
 python get-pure.py journals
+python get-pure.py persons
+python get-pure.py external-persons
 # when source files are present:
 python make-csv.py
 ```
@@ -143,18 +145,19 @@ The following Pure API data is considered mandatory. These are also named in con
 
 * research-outputs
 * journals
+* persons
+* external-persons
 
 The following data from Pure API was looked at but a decision was made not to include (no added value to result):
 
 * organisational-units
-* persons
 
 
 ### Produce CSV
 
 Once all mandatory JSON files are present a call to script called [make-csv.py](make-csv.py) can be made. The script loads research-outputs and journals into memory and produces a CSV file.
 
-The columns chosen for result has been reduced in iterations. With no limitations there were over 300 columns and after collaborating iterations the column count has reduced to 64. There's still plenty to work around, ay.
+The columns chosen for result has been reduced in iterations. With no limitations there were over 300 columns and after collaborating iterations the column count has reduced to about 75. There's still plenty to work around, ay.
 
 TODO
 
@@ -164,11 +167,6 @@ Command line arguments, all optional, for [make-csv.py](make-csv.py) are:
 
 * shows short usage of script and exits
 
--L or --locale `<locale>`
-
-* locale to filter data
-* needed only if JSON data has locales (normally shouldn't)
-
 -r or --research `<researchfile>`
 
 * name of the JSON file with Pure research-outputs data
@@ -177,6 +175,16 @@ Command line arguments, all optional, for [make-csv.py](make-csv.py) are:
 -j or --journal `<journalfile>`
 
 * name of the JSON file with Pure journal data
+* defaults to configuration value
+
+-p or --person `<personfile>`
+
+* name of the JSON file with Pure person data
+* defaults to configuration value
+
+-e or --externalperson `<externalpersonfile>`
+
+* name of the JSON file with Pure external person data
 * defaults to configuration value
 
 -o or --output `<outputfile>`
