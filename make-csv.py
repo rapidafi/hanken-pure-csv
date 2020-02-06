@@ -32,7 +32,8 @@ def makerow(verbose):
   #rowheader = columns.copy()
   #rowheader.sort()
   rowheader = [
-    "uuid",
+    "Pure ID",
+    "Publication UUID",
     "electronicVersions_doi",
     "title",
     "abstract",
@@ -43,24 +44,36 @@ def makerow(verbose):
     "publicationStatuses_publicationDate_year",
     "publicationStatuses_current",
     "publicationStatuses_publicationStatus",
-    "workflow",
+    "Publication Workflow",
     "totalNumberOfAuthors",
     "numberOfInternalAuthors",
-    "personAssociations_person_uuid",
+    "numberOfExternalAuthors",
+    # person
+    "personAssociations_personRole",
     "personAssociations_name_lastName",
     "personAssociations_name_firstName",
-    "personAssociations_personRole",
-    "personAssociations_organisationalUnits_uuid",
-    "personAssociations_organisationalUnits_name",
     "personAssociations_country",
-    "personAssociations_externalPerson_uuid",
-    "personAssociations_externalOrganisations_uuid",
+    "personAssociations_organisationalUnits_name",
     "personAssociations_externalOrganisations_name",
+    "Person Pure ID",
+    "Employee Personec ID",
+    "ORCID ID",
+    "Oodi hlo ID",
+    "MasterDB ID",
+    "Student ID",
+    "personAssociations_person_uuid",
+    "personAssociations_externalPerson_uuid",
+    "personAssociations_organisationalUnits_uuid",
+    "personAssociations_externalOrganisations_uuid",
+    # / person
     "managingOrganisationalUnit_uuid",
     "managingOrganisationalUnit_name",
     "journalAssociation_issn",
     "journalAssociation_title",
     "journalAssociation_journal_type",
+    "Journal UUID",
+    "Journal Pure ID",
+    "Journal Workflow",
     "volume",
     "journalNumber",
     "pages",
@@ -109,7 +122,7 @@ def output(outputfile,items,verbose):
 
   # write to outputfile (always)
   with open(outputfile, 'w', newline='', encoding="UTF-8") as f:
-    writer = csv.DictWriter(f, fieldnames=columns, delimiter=';', quotechar='"', quoting=csv.QUOTE_NONNUMERIC, extrasaction='ignore')
+    writer = csv.DictWriter(f, fieldnames=columns, delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL, extrasaction='ignore')
     writer.writeheader()
     count=0
     for row in items:
@@ -144,13 +157,14 @@ def jpart(objectname,subname,jsonitem):
   return lastpart
 
 # go thru given JSON. Look for bits were interested in and write to output file (CSV)
-def parsejson(jsondata,keywords,metricdata,verbose):
+def parsejson(jsondata,keywords,metricdata,journaldata,persondata,externalpersondata,verbose):
   global currentyear
 
   items = []
   for j in jsondata:
     item = {}
-    item["uuid"] = j["uuid"]
+    item["Pure ID"] = j["pureId"]
+    item["Publication UUID"] = j["uuid"]
 
     electronicVersions_doi = None
     if "electronicVersions" in j:
@@ -192,7 +206,7 @@ def parsejson(jsondata,keywords,metricdata,verbose):
     item["publicationStatuses_current"] = publicationStatuses_current
     item["publicationStatuses_publicationStatus"] = publicationStatuses_publicationStatus
 
-    item["workflow"] = jpart("workflow","workflowStep",j)
+    item["Publication Workflow"] = jpart("workflow","workflowStep",j)
     item["totalNumberOfAuthors"] = str(jv("totalNumberOfAuthors",j))
 
     # nb! next would be personAssociation, but data addition done last, see below
@@ -208,7 +222,7 @@ def parsejson(jsondata,keywords,metricdata,verbose):
     journalAssociation_issn = None
     journalAssociation_title = None
     journalAssociation_journal_type = None
-    # for scopus metrics fetching:
+    # for scopus metrics fetching (also):
     journal_uuid = None
     if "journalAssociation" in j:
       a = j["journalAssociation"]
@@ -224,6 +238,14 @@ def parsejson(jsondata,keywords,metricdata,verbose):
     item["journalAssociation_issn"] = journalAssociation_issn
     item["journalAssociation_title"] = journalAssociation_title
     item["journalAssociation_journal_type"] = journalAssociation_journal_type
+    item["Journal UUID"] = journal_uuid
+    # fetch from journaldata
+    item["Journal Pure ID"] = ""
+    item["Journal Workflow"] = ""
+    for a in journaldata:
+      if a["uuid"] == journal_uuid:
+        item["Journal Pure ID"] = a["pureId"]
+        item["Journal Workflow"] = jpart("workflow","workflowStep",a)
 
     item["volume"] = jv("volume",j)
     item["journalNumber"] = jv("journalNumber",j)
@@ -307,6 +329,7 @@ def parsejson(jsondata,keywords,metricdata,verbose):
     added_persons = False # keep track if nothing was added
     # calculate numberOfInternalAuthors first so it copies fully for every row
     item["numberOfInternalAuthors"] = jv("totalNumberOfAuthors",j)
+    item["numberOfExternalAuthors"] = 0
     if "personAssociations" in j:
       for a in j["personAssociations"]:
         roleIsOK = False # test for role
@@ -317,21 +340,30 @@ def parsejson(jsondata,keywords,metricdata,verbose):
         if roleIsOK:
           if "externalPerson" in a:
             item["numberOfInternalAuthors"] -= 1
+            if item["numberOfInternalAuthors"] < 0:
+              item["numberOfInternalAuthors"] = 0
+            item["numberOfExternalAuthors"] += 1
 
     if "personAssociations" in j:
       for a in j["personAssociations"]:
         added_persons = True # .. will be added
         # reset values here
         personAssociations_personRole = None
-        personAssociations_person_uuid = ""
         personAssociations_name_firstName = None
         personAssociations_name_lastName = None
         personAssociations_country = ""
-        personAssociations_organisationalUnits_uuid = None
         personAssociations_organisationalUnits_name = None
-        personAssociations_externalPerson_uuid = ""
-        personAssociations_externalOrganisations_uuid = None
         personAssociations_externalOrganisations_name = None
+        personAssociations_person_pureid = ""
+        personAssociations_person_employeeid = ""
+        personAssociations_person_orcid = ""
+        personAssociations_person_oodiid = ""
+        personAssociations_person_masterdbid = ""
+        personAssociations_person_studentid = ""
+        personAssociations_person_uuid = ""
+        personAssociations_externalPerson_uuid = ""
+        personAssociations_organisationalUnits_uuid = None
+        personAssociations_externalOrganisations_uuid = None
 
         roleIsOK = False # test for role
         role = jpart("personRole","uri",a)
@@ -340,33 +372,63 @@ def parsejson(jsondata,keywords,metricdata,verbose):
           roleIsOK = True
         if roleIsOK:
           personAssociations_personRole = role
-          if "person" in a:
-            personAssociations_person_uuid = a["person"]["uuid"]
           if "name" in a:
             personAssociations_name_firstName = a["name"]["firstName"]
             personAssociations_name_lastName = a["name"]["lastName"]
           personAssociations_country = jpart("country","uri",a)
+          # fetch person id values, internal and external
+          if "person" in a:
+            personAssociations_person_uuid = a["person"]["uuid"]
+            for p in persondata:
+              if p["uuid"] == personAssociations_person_uuid:
+                personAssociations_person_pureid = p["pureId"]
+                if "orcid" in p: personAssociations_person_orcid = p["orcid"]
+                # list of ids
+                if "ids" in p:
+                  for i in p["ids"]:
+                    if "type" in i:
+                      if "uri" in i["type"]:
+                        if i["type"]["uri"] == "/dk/atira/pure/person/personsources/employee":
+                          personAssociations_person_employeeid = jpart("value","value",i)
+                        if i["type"]["uri"] == "/dk/atira/pure/person/personsources/oodi":
+                          personAssociations_person_oodiid = jpart("value","value",i)
+                        if i["type"]["uri"] == "/dk/atira/pure/person/personsources/masterdb":
+                          personAssociations_person_masterdbid = jpart("value","value",i)
+                        if i["type"]["uri"] == "/dk/atira/pure/person/personsources/studentid":
+                          personAssociations_person_studentid = jpart("value","value",i)
+          if "externalPerson" in a:
+            personAssociations_externalPerson_uuid = a["externalPerson"]["uuid"]
+            for p in externalpersondata:
+              if p["uuid"] == personAssociations_externalPerson_uuid:
+                # should not replace but same field yes
+                personAssociations_person_pureid = p["pureId"]
+                # nb! external persons do not have internal ids
+          # person organisational data
           if "organisationalUnits" in a:
             for b in a["organisationalUnits"]:
               personAssociations_organisationalUnits_uuid = b["uuid"]
               personAssociations_organisationalUnits_name = js_value("name","text",b)
-          if "externalPerson" in a:
-            personAssociations_externalPerson_uuid = a["externalPerson"]["uuid"]
           if "externalOrganisations" in a:
             for b in a["externalOrganisations"]:
               personAssociations_externalOrganisations_uuid = b["uuid"]
               personAssociations_externalOrganisations_name = js_value("name","text",b)
           # add person values to item here, overwrite if 1+ round
-          item["personAssociations_country"] = personAssociations_country
-          item["personAssociations_externalOrganisations_name"] = personAssociations_externalOrganisations_name
-          item["personAssociations_externalOrganisations_uuid"] = personAssociations_externalOrganisations_uuid
+          item["personAssociations_personRole"] = personAssociations_personRole
           item["personAssociations_name_firstName"] = personAssociations_name_firstName
           item["personAssociations_name_lastName"] = personAssociations_name_lastName
+          item["personAssociations_country"] = personAssociations_country
           item["personAssociations_organisationalUnits_name"] = personAssociations_organisationalUnits_name
-          item["personAssociations_organisationalUnits_uuid"] = personAssociations_organisationalUnits_uuid
+          item["personAssociations_externalOrganisations_name"] = personAssociations_externalOrganisations_name
+          item["Person Pure ID"] = personAssociations_person_pureid
+          item["Employee Personec ID"] = personAssociations_person_employeeid
+          item["ORCID ID"] = personAssociations_person_orcid
+          item["Oodi hlo ID"] = personAssociations_person_oodiid
+          item["MasterDB ID"] = personAssociations_person_masterdbid
+          item["Student ID"] = personAssociations_person_studentid
           item["personAssociations_person_uuid"] = personAssociations_person_uuid
           item["personAssociations_externalPerson_uuid"] = personAssociations_externalPerson_uuid
-          item["personAssociations_personRole"] = personAssociations_personRole
+          item["personAssociations_organisationalUnits_uuid"] = personAssociations_organisationalUnits_uuid
+          item["personAssociations_externalOrganisations_uuid"] = personAssociations_externalOrganisations_uuid
           # and append here (not at "root" loop end)
           items.append(item.copy()) #nb! make a copy (not reference)
         #/roleIsOK
@@ -428,6 +490,8 @@ OPTIONS
 Source files with defaults from configuration:
 -r, --research <file>
 -j, --journal <file>
+-p, --person <file>
+-e, --externalperson <file>
 
 Output file with default from configuration:
 -o, --output <file>
@@ -449,6 +513,8 @@ def main(argv):
   verbose = 1 # default minor messages
   researchfile = cfg.get(cfgsec,"researchfile") if cfg.has_option(cfgsec,"researchfile") else None
   journalfile = cfg.get(cfgsec,"journalfile") if cfg.has_option(cfgsec,"journalfile") else None
+  personfile = cfg.get(cfgsec,"personfile") if cfg.has_option(cfgsec,"personfile") else None
+  externalpersonfile = cfg.get(cfgsec,"externalpersonfile") if cfg.has_option(cfgsec,"externalpersonfile") else None
   outputfile = cfg.get(cfgsec,"outputfile") if cfg.has_option(cfgsec,"outputfile") else None
 
   keywords = None
@@ -457,7 +523,7 @@ def main(argv):
 
   # read possible arguments. all optional given that defaults suffice
   try:
-    opts, args = getopt.getopt(argv,"hr:j:o:vq",["help","research=","journal=","output=","verbose","quiet"])
+    opts, args = getopt.getopt(argv,"hr:j:p:e:o:vq",["help","research=","journal=","person=","externalperson=","output=","verbose","quiet"])
   except getopt.GetoptError as err:
     print(err)
     sys.exit(2)
@@ -467,19 +533,25 @@ def main(argv):
       sys.exit(0)
     elif opt in ("-r", "--research"): researchfile = arg
     elif opt in ("-j", "--journal"): journalfile = arg
+    elif opt in ("-p", "--person"): personfile = arg
+    elif opt in ("-e", "--externalperson"): personfile = arg
     elif opt in ("-o", "--output"): outputfile = arg
     elif opt in ("-v", "--verbose"): verbose += 1
     elif opt in ("-q", "--quiet"): verbose -= 1
 
   if not researchfile: exit("No research file. Exit.")
   if not journalfile: exit("No journal file. Exit.")
+  if not personfile: exit("No person file. Exit.")
+  if not externalpersonfile: exit("No externalperson file. Exit.")
   if not outputfile: exit("No output file. Exit.")
 
   jsondata = readjson(researchfile,verbose)
   journaldata = readjson(journalfile,verbose)
+  persondata = readjson(personfile,verbose)
+  externalpersondata = readjson(externalpersonfile,verbose)
 
   metricdata = parsemetrics(journaldata,verbose)
-  items = parsejson(jsondata,keywords,metricdata,verbose)
+  items = parsejson(jsondata,keywords,metricdata,journaldata,persondata,externalpersondata,verbose)
   output(outputfile,items,verbose)
   
 if __name__ == "__main__":
