@@ -1,4 +1,5 @@
 Pure.cfg
+Jufo.cfg
 *~
 *.json
 *.csv
@@ -6,3 +7,5 @@ Pure.cfg
 *.xls*
 *.pbix
 *.zip
+__pycache__
+*.pyc

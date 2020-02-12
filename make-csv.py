@@ -24,6 +24,7 @@ import csv
 import json
 import re
 import configparser
+import jufo
 
 from datetime import datetime
 currentyear = datetime.now().year
@@ -74,6 +75,7 @@ def makerow(verbose):
     "Journal UUID",
     "Journal Pure ID",
     "Journal Workflow",
+    "Publication channel Country",
     "volume",
     "journalNumber",
     "pages",
@@ -99,18 +101,23 @@ def makerow(verbose):
     ,"metrics_2014_citescore"
     ,"metrics_2014_sjr"
     ,"metrics_2014_snip"
+    ,"metrics_2014_jufo"
     ,"metrics_2015_citescore"
     ,"metrics_2015_sjr"
     ,"metrics_2015_snip"
+    ,"metrics_2015_jufo"
     ,"metrics_2016_citescore"
     ,"metrics_2016_sjr"
     ,"metrics_2016_snip"
+    ,"metrics_2016_jufo"
     ,"metrics_2017_citescore"
     ,"metrics_2017_sjr"
     ,"metrics_2017_snip"
+    ,"metrics_2017_jufo"
     ,"metrics_2018_citescore"
     ,"metrics_2018_sjr"
     ,"metrics_2018_snip"
+    ,"metrics_2018_jufo"
   ]
   return rowheader
 
@@ -242,10 +249,13 @@ def parsejson(jsondata,keywords,metricdata,journaldata,persondata,externalperson
     # fetch from journaldata
     item["Journal Pure ID"] = ""
     item["Journal Workflow"] = ""
+    item["Publication channel Country"] = ""
     for a in journaldata:
       if a["uuid"] == journal_uuid:
         item["Journal Pure ID"] = a["pureId"]
         item["Journal Workflow"] = jpart("workflow","workflowStep",a)
+        if "country" in a:
+          item["Publication channel Country"] = js_value("term","text",a["country"])
 
     item["volume"] = jv("volume",j)
     item["journalNumber"] = jv("journalNumber",j)
@@ -310,7 +320,7 @@ def parsejson(jsondata,keywords,metricdata,journaldata,persondata,externalperson
                               item["keyword_field"+t] = w["value"]
 
     # get scopusMetrics from journals
-    metrics = ["sjr","snip","citescore"] # to config?
+    metrics = ["sjr","snip","citescore","jufo"] # to config?
     years = 5 # to config?
     for m in metrics:
       for y in range(currentyear-years, currentyear+1):
@@ -321,7 +331,7 @@ def parsejson(jsondata,keywords,metricdata,journaldata,persondata,externalperson
         if journal_uuid in metricdata:
           if mkey in metricdata[journal_uuid]:
             item["metrics_"+mkey] = metricdata[journal_uuid][mkey]
-    
+
     # nb! row multiplying data
     # so do this/these last
 
@@ -447,7 +457,7 @@ def parsejson(jsondata,keywords,metricdata,journaldata,persondata,externalperson
 
 def parsemetrics(journaldata,verbose):
   global currentyear
-  metrics = ["sjr","snip","citescore"] # to config?
+  metrics = ["sjr","snip","citescore","jufo"] # to config?
   years = 5 # to config?
 
   fromyear = currentyear-years
@@ -458,15 +468,29 @@ def parsemetrics(journaldata,verbose):
     if verbose>2: print("  >>> metrics from journal %s "%(jo["uuid"],))
     metric = {}
     metric["uuid"] = jo["uuid"] #redundant (dev/debug)
-    if "scopusMetrics" in jo:
-      if verbose>2: print("  >>> metrics from journal %s metrics %s"%(jo["uuid"],jo["scopusMetrics"],))
+    for y in range(fromyear, currentyear):
       for m in metrics:
-        for a in jo["scopusMetrics"]:
-          for y in range(fromyear, currentyear):
-            if a["year"] == y:
-              if verbose>2: print("  >>> metrics from journal %s metric %s year %d data %s"%(jo["uuid"],m,y,a,))
-              if m in a:
-                metric[str(y)+"_"+m] = a[m]
+        # jufo resides elsewhere
+        if m == "jufo":
+          if "externalIdSource" in jo and "externalId" in jo:
+            if "jufo" == jo["externalIdSource"]:
+              jufoid = jo["externalId"]
+              jufojson = jufo.get(jufoid)
+              # store if for later use
+              with open("jufo_%s.json"%(jufoid,), "w") as f:
+                json.dump(jufojson, f)
+              for ju in jufojson: # should have only one
+                if "Jufo_ID" in ju and "Jufo_%d"%(y,) in ju:
+                  if jufoid == ju["Jufo_ID"]:
+                    metric[str(y)+"_"+"jufo"] = ju["Jufo_%d"%(y,)]
+        else:
+          if "scopusMetrics" in jo:
+            if verbose>2: print("  >>> metrics from journal %s metrics %s"%(jo["uuid"],jo["scopusMetrics"],))
+            for a in jo["scopusMetrics"]:
+              if a["year"] == y:
+                if verbose>2: print("  >>> metrics from journal %s metric %s year %d data %s"%(jo["uuid"],m,y,a,))
+                if m in a:
+                  metric[str(y)+"_"+m] = a[m]
     if verbose>2: print("  >>> metrics from journal %s metric %s"%(jo["uuid"],metric,))
     metricdata[jo["uuid"]] = metric.copy()
   return metricdata
