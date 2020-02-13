@@ -26,8 +26,11 @@ import re
 import configparser
 import jufo
 
-from datetime import datetime
-currentyear = datetime.now().year
+# values read from config
+keywords = None
+metrics = None
+metricstartyear = None
+metricyears = None
 
 def makerow(verbose):
   #rowheader = columns.copy()
@@ -164,8 +167,8 @@ def jpart(objectname,subname,jsonitem):
   return lastpart
 
 # go thru given JSON. Look for bits were interested in and write to output file (CSV)
-def parsejson(jsondata,keywords,metricdata,journaldata,persondata,externalpersondata,verbose):
-  global currentyear
+def parsejson(jsondata,metricdata,journaldata,persondata,externalpersondata,verbose):
+  global keywords,metrics,metricstartyear,metricyears
 
   items = []
   for j in jsondata:
@@ -320,10 +323,8 @@ def parsejson(jsondata,keywords,metricdata,journaldata,persondata,externalperson
                               item["keyword_field"+t] = w["value"]
 
     # get scopusMetrics from journals
-    metrics = ["sjr","snip","citescore","jufo"] # to config?
-    years = 5 # to config?
     for m in metrics:
-      for y in range(currentyear-years, currentyear+1):
+      for y in range(metricstartyear, metricstartyear+metricyears):
         mkey = str(y)+"_"+m
         # this will make sure column exists in every row
         item["metrics_"+mkey] = None
@@ -456,19 +457,16 @@ def parsejson(jsondata,keywords,metricdata,journaldata,persondata,externalperson
   return items
 
 def parsemetrics(journaldata,verbose):
-  global currentyear
-  metrics = ["sjr","snip","citescore","jufo"] # to config?
-  years = 5 # to config?
+  global metrics,metricstartyear,metricyears
 
-  fromyear = currentyear-years
-  if verbose>1: print("Parse metrics from year %d to %d"%(fromyear,currentyear-1,))
+  if verbose>1: print("Parse metrics from year %d to %d"%(metricstartyear,metricstartyear+metricyears,))
 
   metricdata = {}
   for jo in journaldata:
     if verbose>2: print("  >>> metrics from journal %s "%(jo["uuid"],))
     metric = {}
     metric["uuid"] = jo["uuid"] #redundant (dev/debug)
-    for y in range(fromyear, currentyear):
+    for y in range(metricstartyear, metricstartyear+metricyears):
       for m in metrics:
         # jufo resides elsewhere
         if m == "jufo":
@@ -525,6 +523,8 @@ Output file with default from configuration:
 """)
 
 def main(argv):
+  global keywords,metrics,metricstartyear,metricyears
+
   cfgsec = "CSV"
   cfg = configparser.ConfigParser()
   cfg.read('Pure.cfg')
@@ -541,9 +541,14 @@ def main(argv):
   externalpersonfile = cfg.get(cfgsec,"externalpersonfile") if cfg.has_option(cfgsec,"externalpersonfile") else None
   outputfile = cfg.get(cfgsec,"outputfile") if cfg.has_option(cfgsec,"outputfile") else None
 
-  keywords = None
   if cfg.has_option(cfgsec,"keywords"):
     keywords = json.loads(cfg.get(cfgsec,"keywords"))
+  if cfg.has_option(cfgsec,"metrics"):
+    metrics = json.loads(cfg.get(cfgsec,"metrics"))
+  if cfg.has_option(cfgsec,"metricstartyear"):
+    metricstartyear = int(cfg.get(cfgsec,"metricstartyear"))
+  if cfg.has_option(cfgsec,"metricyears"):
+    metricyears = int(cfg.get(cfgsec,"metricyears"))
 
   # read possible arguments. all optional given that defaults suffice
   try:
@@ -575,7 +580,7 @@ def main(argv):
   externalpersondata = readjson(externalpersonfile,verbose)
 
   metricdata = parsemetrics(journaldata,verbose)
-  items = parsejson(jsondata,keywords,metricdata,journaldata,persondata,externalpersondata,verbose)
+  items = parsejson(jsondata,metricdata,journaldata,persondata,externalpersondata,verbose)
   output(outputfile,items,verbose)
   
 if __name__ == "__main__":
