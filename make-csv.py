@@ -44,7 +44,9 @@ def makerow(verbose):
     "language",
     "type",
     "category",
-    "assessmentType",
+    "Assessment Type Category",
+    "Assessment Type Code",
+    "Assessment Type",
     "publicationStatuses_publicationDate_year",
     "publicationStatuses_current",
     "publicationStatuses_publicationStatus",
@@ -202,7 +204,13 @@ def parsejson(jsondata,metricdata,journaldata,persondata,externalpersondata,verb
 
     item["type"] = jpart("type","uri",j)
     item["category"] = jpart("category","uri",j)
-    item["assessmentType"] = jpart("assessmentType","uri",j)
+    item["Assessment Type Category"] = None
+    item["Assessment Type Code"] = jpart("assessmentType","uri",j)
+    item["Assessment Type"] = None
+    if item["Assessment Type Code"]:
+      item["Assessment Type Category"] = item["Assessment Type Code"][0]
+    if "assessmentType" in j:
+      item["Assessment Type"] = js_value("term","text",j["assessmentType"])
 
     publicationStatuses_publicationDate_year = None
     publicationStatuses_current = None
@@ -475,7 +483,16 @@ def parsemetrics(journaldata,verbose):
               jufoid = jo["externalId"]
               jufojson = jufo.get(jufoid)
               # store if for later use
-              with open("jufo_%s.json"%(jufoid,), "w") as f:
+              jufocfg = configparser.ConfigParser()
+              jufocfgsec = "LOCAL"
+              jufocfg.read('Jufo.cfg')
+              if not jufocfg.has_section(jufocfgsec):
+                print("Failed reading config. Exit")
+                exit(1)
+              # continue w/ [cfgsec] config
+              jufodatadir = jufocfg.get(jufocfgsec,"datadir") if jufocfg.has_option(jufocfgsec,"datadir") else "."
+              jufodatadir += "/"
+              with open(jufodatadir+"jufo_%s.json"%(jufoid,), "w") as f:
                 json.dump(jufojson, f)
               for ju in jufojson: # should have only one
                 if "Jufo_ID" in ju and "Jufo_%d"%(y,) in ju:

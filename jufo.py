@@ -22,19 +22,27 @@ if not cfg.has_section(cfgsec):
 
 apihost = cfg.get(cfgsec,"hostname") if cfg.has_option(cfgsec,"hostname") else None
 apiuri = cfg.get(cfgsec,"uri") if cfg.has_option(cfgsec,"uri") else None
+cfgsec = "LOCAL"
+datadir = cfg.get(cfgsec,"datadir") if cfg.has_option(cfgsec,"datadir") else "."
+datadir += "/"
 
 def show(message):
   print(strftime("%Y-%m-%d %H:%M:%S", localtime())+" "+message)
 
+def put(file,data,verbose=0):
+  global datadir
+  with open(datadir+output, "w") as f:
+    json.dump(data, f)
+
 def get(code,verbose=0):
-  global apihost, apiuri
+  global apihost, apiuri, datadir
   if verbose: show("begin")
   if not code: return
 
   jufodata = None
 
   # try to read from already loaded file
-  filename = "jufo_%s.json"%(code,)
+  filename = datadir+"jufo_%s.json"%(code,)
   if os.path.exists(filename):
     with open(filename, "r") as f:
       jufodata = json.load(f)
@@ -124,8 +132,7 @@ def main(argv):
   jufodata = get(code,verbose)
 
   if output:
-    with open(output, "w") as f:
-      json.dump(jufodata, f)
+    put(output,jufodata)
   if verbose and output:
     show("wrote to %s"%(output,))
 
