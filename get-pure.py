@@ -115,7 +115,7 @@ OPTIONS
                       defaults to en_GB
 -s, --size <size>   : number of items to limit the query size of API
                       defaults to 1000 (API default is 10)
--o, --output <file> : filename to write output to
+-O, --output <file> : filename to write output to
                       may result to many files if -S is given
                       with pattern like "api.json" => "api-0001.json"
                       defaults to "<API>.json"
@@ -138,7 +138,7 @@ def main(argv):
   verbose = 1 # default minor messages
 
   try:
-    opts, args = getopt.getopt(argv,"hH:u:L:o:s:Svq",["help","host=","uri=","locale=","output=","size=","split","verbose","quiet"])
+    opts, args = getopt.getopt(argv,"hH:u:L:O:s:Svq",["help","host=","uri=","locale=","output=","size=","split","verbose","quiet"])
   except getopt.GetoptError as err:
     print(err)
     usage()
@@ -152,7 +152,7 @@ def main(argv):
     elif opt in ("-H", "--host"): hostname = arg
     elif opt in ("-u", "--uri"): uri = arg
     elif opt in ("-L", "--locale"): locale = arg
-    elif opt in ("-o", "--output"): output = arg
+    elif opt in ("-O", "--output"): output = arg
     elif opt in ("-s", "--size"): size = int(arg)
     elif opt in ("-S", "--split"): split = True
     elif opt in ("-v", "--verbose"): verbose += 1

@@ -69,6 +69,7 @@ python get-pure.py research-outputs
 python get-pure.py journals
 python get-pure.py persons
 python get-pure.py external-persons
+python get-pure.py external-organisations
 # when source files are present:
 python make-csv.py
 ```
@@ -119,7 +120,7 @@ OPTIONS
 * also the max number of elements in optional splitted files 
 * defaults to 1000 (API default is 10)
 
--o or --output `<output>`
+-O or --output `<output>`
 
 * filename(s) to save the loaded result to
 * may be many files if given argument -S|--split
@@ -187,7 +188,12 @@ Command line arguments, all optional, for [make-csv.py](make-csv.py) are:
 * name of the JSON file with Pure external person data
 * defaults to configuration value
 
--o or --output `<outputfile>`
+-o or --externalorganisation `<externalorganisationfile>`
+
+* name of the JSON file with Pure external organisation data
+* defaults to configuration value
+
+-O or --output `<outputfile>`
 
 * name of the file where result is written
 * file will be overwritten if it exists
